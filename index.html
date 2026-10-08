@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Monte a Pizza AR</title>
+<meta name="theme-color" content="#1c130e">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: câmera em tela cheia; pedido e placar no topo; ingrediente e dica embaixo; telas de início e fim como cartões de balcão */
+:root{
+  --oven:#1c130e; --flour:#f7efe3; --ash:#c9b8a8; --crust:#f1c27a; --ember:#e8592b; --basil:#62ad55; --danger:#ef5a4c;
+  --panel:rgba(28,19,14,.86); --line:rgba(241,194,122,.25); --slot:rgba(247,239,227,.1);
+  --display:'Shrikhand', Georgia, serif; --body:'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--oven);color:var(--flour);font-family:var(--body);overflow:hidden;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--crust);outline-offset:2px}
+#ar{position:fixed;inset:0;overflow:hidden}
+#touch{position:fixed;inset:0;z-index:2;touch-action:none}
+.top{position:fixed;left:0;right:0;top:0;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:3;pointer-events:none}
+.order{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:9px 12px;display:flex;flex-direction:column;gap:7px;min-width:0;backdrop-filter:blur(6px)}
+.order .lv{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);font-weight:800}
+.order .nm{font-family:var(--display);font-size:17px;color:var(--crust);line-height:1.1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;padding:3px 9px 3px 4px;border-radius:999px;background:var(--slot);font-variant-numeric:tabular-nums}
+.chip img{width:22px;height:22px}
+.chip.done{background:rgba(98,173,85,.3);color:#d7f2cf}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+.score{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 12px;text-align:right}
+.score .k{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash)}
+.score .v{font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.hearts{display:flex;gap:3px}
+.hearts svg{width:22px;height:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.hearts .on path{fill:var(--ember)}
+.hearts .off path{fill:rgba(28,19,14,.6);stroke:var(--line)}
+.wind{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 10px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.wind svg{width:16px;height:16px}
+.ghost{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:600}
+.tray{position:fixed;left:0;right:0;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;align-items:center;gap:4px;z-index:3;pointer-events:none;text-shadow:0 2px 8px rgba(0,0,0,.85)}
+.tray .now{font-family:var(--display);font-size:21px}
+.tray .now.bad{color:#ffb4aa}
+.tray .next{font-size:12.5px;color:var(--ash);display:flex;align-items:center;gap:5px}
+.tray .next img{width:20px;height:20px}
+.scan{position:fixed;inset:0;z-index:3;display:grid;place-items:center;pointer-events:none}
+.scan .box{width:min(64vw,300px);aspect-ratio:1;border-radius:22px;position:relative}
+.scan .box i{position:absolute;width:40px;height:40px;border-color:var(--crust);border-style:solid;border-width:0}
+.scan .box i:nth-child(1){top:0;left:0;border-top-width:4px;border-left-width:4px;border-top-left-radius:22px}
+.scan .box i:nth-child(2){top:0;right:0;border-top-width:4px;border-right-width:4px;border-top-right-radius:22px}
+.scan .box i:nth-child(3){bottom:0;left:0;border-bottom-width:4px;border-left-width:4px;border-bottom-left-radius:22px}
+.scan .box i:nth-child(4){bottom:0;right:0;border-bottom-width:4px;border-right-width:4px;border-bottom-right-radius:22px}
+.scan p{position:absolute;left:0;right:0;bottom:22%;text-align:center;margin:0;padding-inline:24px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.scan .box{animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{50%{transform:scale(.94)}}
+.coach{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);z-index:3;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:8px;font-weight:700;font-size:14px;text-shadow:0 2px 6px rgba(0,0,0,.9);text-align:center;width:min(320px,90%)}
+.coach .finger{width:34px;height:34px;border-radius:50%;background:rgba(247,239,227,.92);box-shadow:0 0 0 8px rgba(247,239,227,.25);animation:flick 1.6s ease-in-out infinite}
+@keyframes flick{0%{transform:translateY(40px);opacity:0}20%{opacity:1}70%{transform:translateY(-70px);opacity:1}100%{transform:translateY(-90px);opacity:0}}
+.toast{position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,8px);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-weight:700;font-size:15px;opacity:0;transition:opacity .18s,transform .18s;z-index:4;pointer-events:none;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.pop{position:fixed;transform:translate(-50%,-50%);font-weight:800;font-size:18px;color:var(--crust);text-shadow:0 2px 6px rgba(0,0,0,.8);pointer-events:none;animation:rise 1s ease-out forwards;z-index:4;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pop.big{font-family:var(--display);font-weight:400;font-size:26px;color:#fff}
+.pop.gold{font-family:var(--display);font-weight:400;font-size:28px;color:#ffd36b}
+.pop.bad{color:#ffb4aa}
+@keyframes rise{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-50px}}
+body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 8px var(--danger);pointer-events:none;z-index:5;animation:hitfl .45s ease forwards}
+@keyframes hitfl{to{opacity:0}}
+.screen{position:fixed;inset:0;z-index:6;display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto;background:radial-gradient(120% 80% at 50% 110%,#5a2c18 0%,#2c1c13 50%,var(--oven) 100%)}
+.screen.over{background:rgba(18,11,7,.6)}
+.panel{width:min(440px,100%);background:rgba(34,23,17,.94);border:1px solid var(--line);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.eyebrow{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ember);font-weight:800}
+h1{margin:-6px 0 0;font-family:var(--display);font-weight:400;font-size:42px;line-height:1.05;color:var(--crust)}
+h2{margin:0;font-family:var(--display);font-weight:400;font-size:28px;color:var(--crust)}
+.lede{margin:0;line-height:1.5;font-size:15px}
+.note{margin:0;font-size:12.5px;line-height:1.45;color:var(--ash)}
+.steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.steps li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.steps b{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ember);display:grid;place-items:center;font-size:13px}
+.btn{border:none;border-radius:14px;padding:15px 16px;font-weight:800;font-size:16px;background:var(--slot)}
+.btn.primary{background:var(--ember);color:#fff8f0}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1 1 140px}
+.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.lvl{border:1px solid var(--line);background:var(--slot);border-radius:12px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
+.lvl .n{font-family:var(--display);font-size:20px;line-height:1;color:var(--crust)}
+.lvl .st{font-size:10px;color:var(--crust);min-height:12px;letter-spacing:1px}
+.lvl.locked{opacity:.4}
+.lvl.sel{border-color:var(--crust);background:rgba(241,194,122,.15)}
+.stars{display:flex;gap:8px}
+.stars svg{width:44px;height:44px}
+.stars .on path{fill:var(--crust)}
+.stars .off path{fill:var(--slot);stroke:var(--line)}
+.big{font-family:var(--display);font-size:46px;line-height:1;color:var(--crust);font-variant-numeric:tabular-nums}
+.lines{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.lines li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.lines li span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+.err{color:#ffb4aa;font-size:14px;margin:0}
+@media (prefers-reduced-motion:reduce){.coach .finger,.scan .box{animation:none}.pop{animation-duration:.01s}}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/",
+  "mindar-image-three":"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+}}
+</script>
+</head>
+<body>
+<div id="ar"></div>
+<div id="touch" hidden></div>
+
+<div class="top" id="hud" hidden>
+  <div class="order"><span class="lv" id="hLv">Nível 1</span><span class="nm" id="hName">Margherita</span><div class="chips" id="hChips"></div></div>
+  <div class="side">
+    <div class="score"><div class="k">Pontos</div><div class="v" id="hScore">0</div></div>
+    <div class="hearts" id="hLives"></div>
+    <div class="wind" id="hWind" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" id="windArrow"><path d="M4 12h15M14 6l6 6-6 6"/></svg><span id="windTxt">Vento</span></div>
+    <button class="ghost" id="quit" type="button">Sair</button>
+  </div>
+</div>
+<div class="tray" id="tray" hidden><div class="now" id="tNow"></div><div class="next" id="tNext"></div></div>
+<div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa</p></div>
+<div class="coach" id="coach" hidden><div class="finger"></div><span id="coachTxt">Deslize para cima para jogar na pizza</span></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<section class="screen" id="start">
+  <div class="panel">
+    <p class="eyebrow">Forno a Lenha · pizzaria de exemplo</p>
+    <h1>Monte a Pizza</h1>
+    <p class="lede">A pizza aparece em cima do adesivo da caixa. Deslize o dedo para cima para jogar os ingredientes do pedido nela.</p>
+    <ul class="steps">
+      <li><b>1</b><span>Coloque a caixa (ou o adesivo impresso) numa mesa bem iluminada.</span></li>
+      <li><b>2</b><span>Toque em "Abrir câmera" e permita o acesso.</span></li>
+      <li><b>3</b><span>Aponte para o adesivo, a uns 30 cm, e espere a pizza aparecer.</span></li>
+    </ul>
+    <div class="levels" id="levels"></div>
+    <button class="btn primary" id="go" type="button">Abrir câmera</button>
+    <p class="err" id="startErr" hidden></p>
+    <p class="note">Ingrediente queimado: deslize para baixo. Errar a pizza custa uma vida. Modelos 3D: KayKit, de Kay Lousberg (CC0).</p>
+  </div>
+</section>
+
+<section class="screen over" id="end" hidden>
+  <div class="panel">
+    <p class="eyebrow" id="eEye">Nível 1</p>
+    <h2 id="eTitle">Pizza pronta!</h2>
+    <div class="stars" id="eStars"></div>
+    <div class="big" id="eScore">0</div>
+    <ul class="lines" id="eLines"></ul>
+    <div class="row">
+      <button class="btn" id="eMenu" type="button">Níveis</button>
+      <button class="btn primary" id="eAgain" type="button">Jogar de novo</button>
+    </div>
+    <button class="btn" id="eNext" type="button" hidden>Próximo nível</button>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MindARThree } from 'mindar-image-three';
+
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random()*(b - a);
+
+/* ================= Dados ================= */
+const ING = {
+  tomate:{label:'Tomate', fly:0, land:1, s:1, ls:.75, color:0xe0412b},
+  mussarela:{label:'Mussarela', fly:2, land:3, s:1, ls:.8, color:0xf3c64a},
+  cebola:{label:'Cebola', fly:4, land:5, s:.9, ls:.8, color:0xe9d9c2},
+  presunto:{label:'Presunto', fly:6, land:7, s:.62, ls:.6, color:0xf0a3a0, tint:0xf6b0b0}
+};
+const BURNT = {queimado:{label:'Queimado', fly:9, s:.75}, carvao:{label:'Queimado', fly:8, s:.8}};
+const LEVELS = [
+  {name:'Margherita', need:{tomate:3, mussarela:3}, move:0, wind:0, burnt:0, r:1.7},
+  {name:'Mussarela', need:{mussarela:5, tomate:2}, move:0, wind:0, burnt:.12, r:1.6},
+  {name:'Presunto', need:{presunto:4, mussarela:3}, move:.5, wind:0, burnt:.12, r:1.6},
+  {name:'Cebola', need:{cebola:4, mussarela:3, tomate:1}, move:.7, wind:0, burnt:.15, r:1.55},
+  {name:'Napolitana', need:{tomate:4, mussarela:4}, move:.5, wind:1.5, burnt:.15, r:1.5},
+  {name:'Portuguesa', need:{presunto:3, cebola:3, tomate:2, mussarela:2}, move:.8, wind:1.5, burnt:.18, r:1.5},
+  {name:'Da Casa', need:{presunto:3, cebola:3, mussarela:4}, move:1, wind:2.2, burnt:.2, r:1.4},
+  {name:'Especial', need:{tomate:3, presunto:3, cebola:2, mussarela:3}, move:1.1, wind:2.6, burnt:.22, r:1.35, orbit:true},
+  {name:'Brotinho', need:{mussarela:4, presunto:3, tomate:3}, move:1.2, wind:3, burnt:.24, r:1.15, orbit:true},
+  {name:'Pizzaiolo Mestre', need:{tomate:3, mussarela:4, cebola:3, presunto:3}, move:1.35, wind:3.4, burnt:.26, r:1.2, orbit:true}
+];
+
+/* Progresso guardado só neste celular */
+const KEY = 'monte-a-pizza-ar-v1';
+let P = {unlocked:1, stars:{}, best:{}};
+try{ P = Object.assign(P, JSON.parse(localStorage.getItem(KEY)) || {}); }catch(e){}
+const saveP = () => { try{ localStorage.setItem(KEY, JSON.stringify(P)); }catch(e){} };
+let selLevel = Math.min(P.unlocked, 10);
+
+function renderLevels(){
+  $('levels').innerHTML = LEVELS.map((L, i) => {
+    const n = i + 1, open = n <= P.unlocked, st = P.stars[n] || 0;
+    return '<button type="button" class="lvl' + (open ? '' : ' locked') + (n === selLevel ? ' sel' : '') + '" data-n="' + n + '" aria-label="Nível ' + n + ', ' + L.name + (open ? '' : ', trancado') + '"><span class="n">' + n + '</span><span class="st">' + (st ? '★'.repeat(st) : '') + '</span></button>';
+  }).join('');
+}
+$('levels').addEventListener('click', e => { const b = e.target.closest('.lvl'); if(!b) return; const n = +b.dataset.n; if(n <= P.unlocked){ selLevel = n; renderLevels(); } });
+renderLevels();
+
+/* ================= Modelos ================= */
+let SCENES = null;
+const THUMB = {};
+function model(i, tint){
+  const o = SCENES[i].clone(true);
+  o.traverse(c => { if(c.isMesh && tint){ c.material = c.material.clone(); c.material.color.setHex(tint); } });
+  const w = new THREE.Group(); w.add(o);
+  const box = new THREE.Box3().setFromObject(o), ctr = box.getCenter(new THREE.Vector3());
+  o.position.set(-ctr.x, -box.min.y, -ctr.z);
+  return w;
+}
+const modelsReady = new Promise((res, rej) => new GLTFLoader().load('models.glb', g => { SCENES = g.scenes; res(); }, undefined, rej));
+function makeThumbs(){
+  const c = document.createElement('canvas'); c.width = c.height = 96;
+  const r = new THREE.WebGLRenderer({canvas:c, alpha:true, antialias:true, preserveDrawingBuffer:true});
+  r.outputEncoding = THREE.sRGBEncoding;
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xffffff, 0x664433, 1.2));
+  const d = new THREE.DirectionalLight(0xffffff, 1); d.position.set(2, 4, 3); sc.add(d);
+  const cm = new THREE.PerspectiveCamera(30, 1, .01, 50);
+  Object.keys(ING).concat(['queimado']).forEach(k => {
+    const def = ING[k] || BURNT[k], m = model(def.fly, def.tint);
+    const b = new THREE.Box3().setFromObject(m), sz = b.getSize(new THREE.Vector3()), ctr = b.getCenter(new THREE.Vector3());
+    const R = Math.max(sz.x, sz.y, sz.z);
+    cm.position.set(ctr.x + R*1.3, ctr.y + R*1.3, ctr.z + R*1.9); cm.lookAt(ctr);
+    sc.add(m); r.render(sc, cm); THUMB[k] = c.toDataURL(); sc.remove(m);
+  });
+  r.dispose();
+}
+
+/* ================= Pizza (feita em código) ================= */
+function canvasTex(w, h, draw, rep){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding;
+  if(rep){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); }
+  return t;
+}
+function rng(seed){ let s = seed; return () => (s = (s*16807) % 2147483647) / 2147483647; }
+const sauceTex = canvasTex(512, 512, (g, w, h) => { g.fillStyle = '#c6301c'; g.fillRect(0,0,w,h); const r = rng(21);
+  for(let i=0;i<260;i++){ g.fillStyle = r() < .5 ? 'rgba(120,20,10,.18)' : 'rgba(255,120,80,.14)'; g.beginPath(); g.arc(r()*w, r()*h, 6 + r()*26, 0, 6.3); g.fill(); }
+  for(let i=0;i<70;i++){ g.fillStyle = 'rgba(60,110,40,.55)'; g.fillRect(r()*w, r()*h, 3 + r()*3, 2); } });
+const crustTex = canvasTex(256, 64, (g, w, h) => { g.fillStyle = '#e2a75c'; g.fillRect(0,0,w,h); const r = rng(9);
+  for(let i=0;i<160;i++){ g.fillStyle = r() < .55 ? 'rgba(150,80,25,.35)' : 'rgba(255,230,180,.3)'; g.beginPath(); g.arc(r()*w, r()*h, 2 + r()*7, 0, 6.3); g.fill(); } }, [6, 1]);
+
+/* ================= Estado do jogo ================= */
+let mindar = null, renderer, scene, camera, anchor, root, pizza, pizzaBody, toppings, goldRing, gr1, shadow;
+let tracking = false, G = null, current = null, flying = [], landed = [], parts = [];
+const GRAV = -30, SCALE = .17;
+
+function mesh(g, m){ return new THREE.Mesh(g, m); }
+function buildPizza(r){
+  while(pizzaBody.children.length) pizzaBody.remove(pizzaBody.children[0]);
+  const base = mesh(new THREE.CylinderGeometry(r + .05, r + .12, .16, 64), new THREE.MeshStandardMaterial({color:0xc98a4a, roughness:.85})); base.position.y = .08; pizzaBody.add(base);
+  const sauce = mesh(new THREE.CylinderGeometry(r - .14, r - .14, .04, 64), new THREE.MeshStandardMaterial({map:sauceTex, roughness:.55})); sauce.position.y = .17; pizzaBody.add(sauce);
+  const crust = mesh(new THREE.TorusGeometry(r - .06, .13, 16, 72), new THREE.MeshStandardMaterial({map:crustTex, roughness:.8})); crust.rotation.x = Math.PI/2; crust.position.y = .19; pizzaBody.add(crust);
+  pizza.userData.r = r;
+  shadow.scale.setScalar(r/1.7);
+}
+function setupScene(){
+  scene.add(new THREE.HemisphereLight(0xfff1dd, 0x5a3a24, 1.1));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1); sun.position.set(-.3, 1, .6); scene.add(sun);
+  root = new THREE.Group(); root.rotation.x = Math.PI/2; root.position.set(0, -.08, 0); root.scale.setScalar(SCALE);
+  anchor.group.add(root);
+  shadow = mesh(new THREE.CircleGeometry(2.1, 48), new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.35, depthWrite:false}));
+  shadow.rotation.x = -Math.PI/2; shadow.position.y = .005;
+  pizza = new THREE.Group(); root.add(pizza); pizza.add(shadow);
+  pizzaBody = new THREE.Group(); pizza.add(pizzaBody);
+  toppings = new THREE.Group(); toppings.position.y = .19; pizza.add(toppings);
+  goldRing = new THREE.Group(); goldRing.position.y = .22; pizza.add(goldRing);
+  gr1 = mesh(new THREE.RingGeometry(.36, .46, 40), new THREE.MeshBasicMaterial({color:0xffd36b, transparent:true, opacity:.95, depthWrite:false})); gr1.rotation.x = -Math.PI/2; goldRing.add(gr1);
+  const gr2 = mesh(new THREE.CircleGeometry(.36, 40), new THREE.MeshBasicMaterial({color:0xffd36b, transparent:true, opacity:.22, depthWrite:false})); gr2.rotation.x = -Math.PI/2; goldRing.add(gr2);
+  buildPizza(1.7);
+}
+
+/* ================= Início ================= */
+$('go').addEventListener('click', async () => {
+  $('go').disabled = true; $('go').textContent = 'Abrindo a câmera…'; $('startErr').hidden = true;
+  try{
+    await modelsReady;
+    if(!mindar){
+      mindar = new MindARThree({container:$('ar'), imageTargetSrc:'targets.mind', uiScanning:'no', uiLoading:'no', uiError:'no', filterMinCF:.0001, filterBeta:.001});
+      ({renderer, scene, camera} = mindar);
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      anchor = mindar.addAnchor(0);
+      anchor.onTargetFound = () => { tracking = true; $('scan').hidden = true; if(G && G.phase === 'play' && !current) nextItem(); };
+      anchor.onTargetLost = () => { tracking = false; if(mode === 'play') $('scan').hidden = false; };
+      setupScene();
+      await mindar.start();
+      makeThumbs();
+      renderer.setAnimationLoop(loop);
+    }
+    startLevel(selLevel);
+  }catch(err){
+    console.error(err);
+    $('startErr').textContent = 'Não foi possível abrir a câmera. Verifique se o navegador tem permissão para usar a câmera e se a página está em https.';
+    $('startErr').hidden = false;
+  }
+  $('go').disabled = false; $('go').textContent = 'Abrir câmera';
+});
+
+let mode = 'start';
+function startLevel(n){
+  clearPlay();
+  const L = LEVELS[n-1];
+  buildPizza(L.r); pizza.position.set(0, 0, 0); pizza.rotation.y = 0;
+  G = {lvl:n, L, got:{}, score:0, lives:3, combo:0, best:0, perfects:0, hits:0, phase:'play', endT:0, t:0, wind:0, queue:[]};
+  G.queue = buildQueue(); moveGold(); rollWind();
+  mode = 'play';
+  $('start').hidden = true; $('end').hidden = true;
+  $('hud').hidden = false; $('tray').hidden = false; $('touch').hidden = false;
+  $('scan').hidden = tracking;
+  $('hLv').textContent = 'Nível ' + n; $('hName').textContent = L.name;
+  $('coach').hidden = !(n <= 2); $('coachTxt').textContent = n === 2 ? 'Ingrediente queimado: deslize para baixo' : 'Deslize para cima para jogar na pizza';
+  if(tracking) nextItem();
+  renderHUD();
+}
+function clearPlay(){
+  flying.forEach(f => f.mesh.parent && f.mesh.parent.remove(f.mesh)); landed.forEach(l => l.mesh.parent && l.mesh.parent.remove(l.mesh));
+  flying = []; landed = [];
+  if(current){ current.mesh.parent && current.mesh.parent.remove(current.mesh); current = null; }
+  if(toppings) while(toppings.children.length) toppings.remove(toppings.children[0]);
+}
+const leftOf = k => G ? (G.L.need[k] || 0) - (G.got[k] || 0) : 0;
+const inAir = k => flying.filter(f => f.key === k).length;
+function buildQueue(){
+  const q = []; Object.keys(G.L.need).forEach(k => { for(let i=0;i<G.L.need[k];i++) q.push(k); });
+  for(let i=q.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [q[i], q[j]] = [q[j], q[i]]; }
+  const out = []; q.forEach((k, i) => { if(i > 1 && Math.random() < G.L.burnt) out.push(Math.random() < .5 ? 'queimado' : 'carvao'); out.push(k); });
+  return out;
+}
+function nextItem(){
+  if(!G || G.phase !== 'play' || current) return;
+  let key = G.queue.shift();
+  while(key && !BURNT[key] && leftOf(key) - inAir(key) <= 0) key = G.queue.shift();
+  if(!key){ const miss = Object.keys(G.L.need).filter(k => leftOf(k) - inAir(k) > 0); if(!miss.length){ renderTray(); return; } key = miss[0]; }
+  const def = ING[key] || BURNT[key];
+  const m = model(def.fly, def.tint); m.scale.setScalar(.01); root.add(m);
+  current = {key, burnt:!!BURNT[key], mesh:m, s:def.s, grow:0, smokeT:0, drag:null};
+  renderTray();
+}
+function moveGold(){ const r = pizza.userData.r*.55, a = Math.random()*6.283, d = Math.sqrt(Math.random())*r; goldRing.position.set(Math.cos(a)*d, .22, Math.sin(a)*d); }
+function rollWind(){
+  if(!G.L.wind){ G.wind = 0; $('hWind').hidden = true; return; }
+  G.wind = (Math.random() < .5 ? -1 : 1)*rand(.35, 1)*G.L.wind;
+  $('hWind').hidden = false; $('windArrow').style.transform = 'scaleX(' + (G.wind < 0 ? -1 : 1) + ')'; $('windTxt').textContent = 'Vento ' + Math.abs(G.wind).toFixed(1);
+}
+
+/* Posição "na mão": entre a câmera e a pizza, um pouco abaixo do centro da tela */
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3(), tmpC = new THREE.Vector3();
+function handPoint(out, dx, dy){
+  camera.getWorldPosition(tmpA);
+  pizza.getWorldPosition(tmpB);
+  const dist = tmpA.distanceTo(tmpB);
+  const down = tmpC.set(0, -1, 0).applyQuaternion(camera.quaternion);
+  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
+  out.copy(tmpA).lerp(tmpB, .3).addScaledVector(down, dist*(.07 - dy*.12)).addScaledVector(right, dist*dx*.12);
+  return root.worldToLocal(out);
+}
+function camLocal(){ camera.getWorldPosition(tmpA); return root.worldToLocal(tmpA.clone()); }
+
+/* ================= Gestos ================= */
+const samples = []; let dragId = null;
+const touch = $('touch');
+touch.addEventListener('pointerdown', e => {
+  if(mode !== 'play' || !current || current.grow < .8 || !tracking || dragId !== null) return;
+  dragId = e.pointerId; samples.length = 0; samples.push({x:e.clientX, y:e.clientY, t:performance.now()});
+  current.drag = {x0:e.clientX, y0:e.clientY, dx:0, dy:0};
+  try{ touch.setPointerCapture(e.pointerId); }catch(err){}
+  $('coach').hidden = true;
+});
+touch.addEventListener('pointermove', e => {
+  if(e.pointerId !== dragId || !current) return;
+  samples.push({x:e.clientX, y:e.clientY, t:performance.now()}); if(samples.length > 12) samples.shift();
+  current.drag.dx = e.clientX - current.drag.x0; current.drag.dy = e.clientY - current.drag.y0;
+});
+touch.addEventListener('pointerup', e => {
+  if(e.pointerId !== dragId) return; dragId = null; if(!current) return;
+  samples.push({x:e.clientX, y:e.clientY, t:performance.now()});
+  const now = performance.now(), recent = samples.filter(s => now - s.t < 130);
+  const a = recent[0] || samples[0], b = samples[samples.length-1], dt = Math.max(16, b.t - a.t)/1000;
+  let vx = (b.x - a.x)/dt, vy = (b.y - a.y)/dt; const tdy = b.y - samples[0].y;
+  if(Math.abs(vy) < 250 && Math.abs(tdy) > 60){ vy = tdy/.25; vx = (b.x - samples[0].x)/.25; }
+  current.drag = null;
+  if(vy < -250) throwIt(vx, vy); else if(vy > 250) binIt();
+});
+touch.addEventListener('pointercancel', e => { if(e.pointerId === dragId){ dragId = null; if(current) current.drag = null; } });
+
+function throwIt(vx, vy){
+  const c = current; current = null;
+  const H = innerHeight, n = -vy/H, R = pizza.userData.r;
+  const O = c.mesh.position.clone(), cam = camLocal();
+  const fwd = new THREE.Vector3(pizza.position.x - cam.x, 0, pizza.position.z - cam.z).normalize();
+  const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const yaw = Math.atan2(vx, -vy);
+  const along = (Math.max(-2, Math.min(4, n)) - 1.6)*R*1.0;
+  const lat = Math.tan(Math.max(-1.1, Math.min(1.1, yaw)))*R*2.2;
+  const L = pizza.position.clone().addScaledVector(fwd, along).addScaledVector(side, lat); L.y = .22;
+  const T = Math.max(.6, Math.min(1.05, .5 + O.distanceTo(L)*.02));
+  const v = L.clone().sub(O).divideScalar(T); v.y -= .5*GRAV*T;
+  flying.push({key:c.key, burnt:c.burnt, mesh:c.mesh, pos:O, vel:v, spin:new THREE.Vector3(rand(-8,-4), rand(-3,3), rand(-2,2)), s:c.s, sc:c.mesh.scale.x});
+  renderTray();
+  setTimeout(nextItem, 380);
+}
+function binIt(){
+  const c = current; current = null;
+  const cam = camLocal(), away = c.mesh.position.clone().sub(cam).normalize();
+  flying.push({key:c.key, burnt:c.burnt, mesh:c.mesh, pos:c.mesh.position.clone(), vel:new THREE.Vector3(0, -12, 0).addScaledVector(away, -4), spin:new THREE.Vector3(3, 0, 0), binned:true, t:0, sc:c.mesh.scale.x});
+  if(c.burnt){ G.score += 50; popupAt('+50 descartado', innerWidth/2, innerHeight*.72, ''); }
+  else { G.queue.push(c.key); toast(ING[c.key].label + ' vai na pizza: volta para a fila'); }
+  renderHUD(); setTimeout(nextItem, 300);
+}
+function land(f, hit, local){
+  if(f.burnt){
+    f.mesh.parent && f.mesh.parent.remove(f.mesh);
+    if(hit){ puff(f.pos, 0x3b3633, 12); loseLife('Queimado na pizza!'); } else toast('Ufa, o queimado caiu fora');
+    return;
+  }
+  if(hit && leftOf(f.key) > 0){
+    f.mesh.parent && f.mesh.parent.remove(f.mesh);
+    const def = ING[f.key], t = model(def.land, def.tint);
+    t.position.set(local.x, 0, local.z); t.rotation.y = Math.random()*6.28; t.scale.setScalar(.01);
+    toppings.add(t); landed.push({mesh:t, grow:0, ls:def.ls});
+    G.got[f.key] = (G.got[f.key] || 0) + 1; G.hits++; G.combo++; G.best = Math.max(G.best, G.combo);
+    const mult = Math.min(5, G.combo);
+    const perfect = Math.hypot(local.x - goldRing.position.x, local.z - goldRing.position.z) < .5;
+    let pts = 100*mult;
+    if(perfect){ pts += 150*mult; G.perfects++; popup('Perfeito! +' + pts, f.pos, 'gold'); moveGold(); puff(f.pos, 0xffd36b, 12); }
+    else popup('+' + pts + (mult > 1 ? '  combo ×' + mult : ''), f.pos, 'big');
+    puff(f.pos, def.color, 8);
+    G.score += pts; rollWind(); renderHUD();
+    if(Object.keys(G.L.need).every(k => leftOf(k) <= 0)) win();
+  } else {
+    G.combo = 0;
+    if(hit){ f.mesh.parent && f.mesh.parent.remove(f.mesh); popup('Já tem bastante', f.pos, 'bad'); renderHUD(); return; }
+    landed.push({mesh:f.mesh, fade:1.2, ground:true});
+    G.queue.push(f.key); loseLife('Errou a pizza');
+  }
+}
+function loseLife(msg){
+  if(G.phase !== 'play') return;
+  G.lives--; G.combo = 0; toast(msg);
+  document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
+  if(navigator.vibrate) try{ navigator.vibrate(120); }catch(e){}
+  if(G.lives <= 0){ G.phase = 'lost'; G.endT = 1.1; if(current){ current.mesh.parent && current.mesh.parent.remove(current.mesh); current = null; } }
+  renderHUD();
+}
+function win(){
+  G.phase = 'won'; G.endT = 2.4;
+  if(current){ current.mesh.parent && current.mesh.parent.remove(current.mesh); current = null; }
+  renderTray(); toast('Pizza completa!');
+  for(let i=0;i<5;i++) setTimeout(() => puff(pizza.position.clone().add(new THREE.Vector3(rand(-1,1), 1, rand(-1,1))), [0xe8592b,0xf1c27a,0x62ad55,0xffffff,0xffd36b][i], 14), i*220);
+}
+
+/* Partículas simples */
+const partGeo = new THREE.SphereGeometry(1, 8, 6);
+function puff(pos, color, n){
+  for(let i=0;i<n;i++){
+    const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({color, transparent:true}));
+    const s = rand(.04, .1); m.scale.setScalar(s); m.position.copy(pos); root.add(m);
+    parts.push({m, s, t:0, life:rand(.5, .9), v:new THREE.Vector3(rand(-3,3), rand(2,5), rand(-3,3))});
+  }
+}
+function updateParts(dt){
+  for(let i=parts.length-1;i>=0;i--){
+    const p = parts[i]; p.t += dt; p.v.y -= 12*dt; p.m.position.addScaledVector(p.v, dt); p.m.material.opacity = Math.max(0, 1 - p.t/p.life);
+    if(p.t >= p.life){ root.remove(p.m); p.m.material.dispose(); parts.splice(i,1); }
+  }
+}
+function popup(text, localPos, cls){
+  const w = root.localToWorld(localPos.clone().add(new THREE.Vector3(0, 1, 0))).project(camera);
+  if(w.z > 1) return;
+  popupAt(text, (w.x+1)/2*innerWidth, (1-w.y)/2*innerHeight, cls);
+}
+function popupAt(text, x, y, cls){
+  const el = document.createElement('div'); el.className = 'pop ' + (cls || ''); el.textContent = text;
+  el.style.left = x + 'px'; el.style.top = y + 'px'; document.body.appendChild(el); setTimeout(() => el.remove(), 1050);
+}
+let toastT = 0;
+function toast(t){ const el = $('toast'); el.textContent = t; el.className = 'toast show'; clearTimeout(toastT); toastT = setTimeout(() => el.className = 'toast', 1500); }
+
+/* ================= Loop ================= */
+let last = performance.now();
+function loop(){
+  const now = performance.now(), dt = Math.min(.05, (now - last)/1000), t = now/1000; last = now;
+  if(G && mode === 'play'){
+    G.t += dt;
+    const L = G.L;
+    if(L.move && G.phase === 'play'){ pizza.position.x = Math.sin(G.t*L.move)*2.3; pizza.position.z = L.orbit ? Math.cos(G.t*L.move*.8)*1.1 : 0; }
+    pizza.rotation.y += dt*(G.phase === 'won' ? 2.2 : .15);
+    if(current && tracking){
+      const c = current; c.grow = Math.min(1, c.grow + dt*3.5);
+      const s = (c.grow < .7 ? c.grow/.7*1.12 : 1.12 - (c.grow - .7)/.3*.12)*c.s*.55;
+      c.mesh.scale.setScalar(Math.max(.01, s));
+      const d = c.drag;
+      handPoint(c.mesh.position, d ? d.dx/innerWidth : 0, d ? -d.dy/innerHeight : 0);
+      c.mesh.position.y += Math.sin(t*2.4)*.05;
+      c.mesh.rotation.y += dt*.9;
+      if(c.burnt){ c.smokeT -= dt; if(c.smokeT <= 0){ c.smokeT = .2; puff(c.mesh.position.clone().add(new THREE.Vector3(0, .3, 0)), 0x5a5552, 1); } }
+    }
+    for(let i=flying.length-1;i>=0;i--){
+      const f = flying[i];
+      f.vel.y += GRAV*dt; if(!f.binned) f.vel.x += G.wind*dt;
+      f.pos.addScaledVector(f.vel, dt); f.mesh.position.copy(f.pos);
+      f.mesh.rotation.x += f.spin.x*dt; f.mesh.rotation.y += f.spin.y*dt; f.mesh.rotation.z += f.spin.z*dt;
+      if(f.binned){ f.t += dt; if(f.t > .7){ f.mesh.parent && f.mesh.parent.remove(f.mesh); flying.splice(i,1); } continue; }
+      const k = Math.min(1, f.sc/.55 + .02); f.mesh.scale.setScalar(Math.min(f.s, f.mesh.scale.x + dt*1.2));
+      const local = f.pos.clone().sub(pizza.position).applyAxisAngle(new THREE.Vector3(0,1,0), -pizza.rotation.y);
+      const onPizza = Math.hypot(local.x, local.z) < pizza.userData.r - .05;
+      const gy = onPizza ? .22 : 0;
+      if(f.vel.y < 0 && f.pos.y <= gy + .05){
+        flying.splice(i, 1);
+        if(!onPizza){ f.pos.y = 0; f.mesh.position.y = 0; f.mesh.rotation.set(0, f.mesh.rotation.y, 0); }
+        land(f, onPizza, local);
+      } else if(f.pos.y < -3){ flying.splice(i,1); f.mesh.parent && f.mesh.parent.remove(f.mesh); if(!f.burnt){ G.queue.push(f.key); loseLife('Errou a pizza'); } }
+    }
+    for(let i=landed.length-1;i>=0;i--){
+      const l = landed[i];
+      if(l.ground){ l.fade -= dt; if(l.fade < .4) l.mesh.scale.multiplyScalar(Math.max(0, 1 - dt*6)); if(l.fade <= 0){ l.mesh.parent && l.mesh.parent.remove(l.mesh); landed.splice(i,1); } continue; }
+      if(l.grow < 1){ l.grow = Math.min(1, l.grow + dt*5); const s = l.grow < .6 ? l.grow/.6*1.25 : 1.25 - (l.grow - .6)/.4*.25; l.mesh.scale.set(s*l.ls, Math.max(.01, (2 - s)*.5*l.ls), s*l.ls); }
+    }
+    gr1.material.opacity = .65 + Math.sin(t*5)*.3; goldRing.scale.setScalar(1 + Math.sin(t*5)*.06); goldRing.visible = G.phase === 'play';
+    if(G.phase !== 'play'){ G.endT -= dt; if(G.endT <= 0) finish(G.phase === 'won'); }
+  }
+  updateParts(dt);
+  renderer.render(scene, camera);
+}
+
+/* ================= HUD e fim ================= */
+const HEART = '<path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" stroke-width="1"/>';
+const STAR = '<path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" stroke-width="1"/>';
+function renderHUD(){
+  if(!G) return;
+  $('hScore').textContent = G.score.toLocaleString('pt-BR');
+  $('hLives').innerHTML = [0,1,2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < G.lives ? 'on' : 'off') + '" aria-hidden="true">' + HEART + '</svg>').join('');
+  $('hChips').innerHTML = Object.keys(G.L.need).map(k => '<span class="chip' + ((G.got[k] || 0) >= G.L.need[k] ? ' done' : '') + '" title="' + ING[k].label + '"><img alt="" src="' + (THUMB[k] || '') + '">' + (G.got[k] || 0) + '/' + G.L.need[k] + '</span>').join('');
+}
+function renderTray(){
+  if(!G) return;
+  const now = $('tNow');
+  if(current){ now.textContent = current.burnt ? 'Queimado! Deslize para baixo' : ING[current.key].label; now.className = 'now' + (current.burnt ? ' bad' : ''); } else now.textContent = '';
+  const nx = G.queue.find(k => BURNT[k] || leftOf(k) - inAir(k) > (current && current.key === k ? 1 : 0));
+  $('tNext').innerHTML = nx ? 'Próximo: <img alt="" src="' + (THUMB[BURNT[nx] ? 'queimado' : nx] || '') + '">' + (BURNT[nx] ? 'queimado' : ING[nx].label) : '';
+}
+function finish(won){
+  mode = 'end';
+  const lb = won ? G.lives*300 : 0, base = G.score; G.score += lb;
+  const stars = won ? G.lives : 0;
+  if(won && G.lvl + 1 > P.unlocked) P.unlocked = Math.min(10, G.lvl + 1);
+  if(stars > (P.stars[G.lvl] || 0)) P.stars[G.lvl] = stars;
+  if(G.score > (P.best[G.lvl] || 0)) P.best[G.lvl] = G.score;
+  saveP();
+  $('hud').hidden = true; $('tray').hidden = true; $('coach').hidden = true; $('touch').hidden = true; $('scan').hidden = true;
+  $('eEye').textContent = 'Nível ' + G.lvl + ' · ' + G.L.name;
+  $('eTitle').textContent = won ? 'Pizza pronta!' : 'Acabaram as vidas';
+  $('eStars').innerHTML = [0,1,2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
+  $('eScore').textContent = G.score.toLocaleString('pt-BR');
+  const total = Object.values(G.L.need).reduce((a, b) => a + b, 0);
+  const lines = [['Ingredientes na pizza (' + G.hits + ' de ' + total + ')', base.toLocaleString('pt-BR')], ['Acertos no anel dourado', String(G.perfects)], ['Maior combo', '×' + Math.min(5, G.best)]];
+  if(won) lines.push(['Bônus de vidas (' + G.lives + ' × 300)', lb.toLocaleString('pt-BR')]);
+  $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
+  $('eNext').hidden = !(won && G.lvl < 10);
+  $('end').hidden = false;
+}
+$('eAgain').addEventListener('click', () => startLevel(G.lvl));
+$('eNext').addEventListener('click', () => { selLevel = G.lvl + 1; startLevel(selLevel); });
+$('eMenu').addEventListener('click', toStart);
+$('quit').addEventListener('click', toStart);
+function toStart(){
+  mode = 'start'; clearPlay(); G = null;
+  ['hud','tray','coach','touch','scan','end'].forEach(id => $(id).hidden = true);
+  renderLevels(); $('go').textContent = 'Jogar'; $('start').hidden = false;
+}
+</script>
+</body>
+</html>
