@@ -99,8 +99,26 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:28px;color:var(
 .lines li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:6px}
 .lines li span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
 .err{color:#ffb4aa;font-size:14px;margin:0}
+.acct{border:1px dashed var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px;background:rgba(241,194,122,.05)}
+.acct .hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.acct .hd b{font-size:15px}
+.acct .hd span{font-size:12.5px;color:var(--ash);font-variant-numeric:tabular-nums}
+.dots{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+.dots i{aspect-ratio:1;border-radius:50%;border:1.5px dashed var(--line)}
+.dots i.on{border:none;background:var(--ember);box-shadow:inset 0 0 0 4px var(--crust)}
+.info{margin:0;font-size:14px;line-height:1.45}
+.info.good{color:#cfeec8}
+.info.warn{color:#ffd8a8}
+.info.bad{color:#ffb4aa}
+.claim{display:flex;flex-direction:column;gap:10px}
+.claim label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ash)}
+.claim input{background:rgba(0,0,0,.28);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--flour);font-size:17px;font-family:var(--body)}
+.linkbtn{background:none;border:none;color:var(--ash);text-decoration:underline;font-size:13px;padding:0;align-self:flex-start}
+.demo{font-size:12px;color:var(--ash);border:1px solid var(--line);border-radius:999px;padding:3px 10px;align-self:flex-start}
 @media (prefers-reduced-motion:reduce){.coach .finger,.scan .box{animation:none}.pop{animation-duration:.01s}}
 </style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
@@ -129,9 +147,10 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:28px;color:var(
 
 <section class="screen" id="start">
   <div class="panel">
-    <p class="eyebrow">Forno a Lenha · pizzaria de exemplo</p>
+    <p class="eyebrow" id="pzEyebrow">Monte a Pizza · jogo e cartão fidelidade</p>
     <h1>Monte a Pizza</h1>
     <p class="lede">A pizza aparece em cima do adesivo da caixa. Deslize o dedo para cima para jogar os ingredientes do pedido nela.</p>
+    <div id="acct" class="acct" hidden></div>
     <ul class="steps">
       <li><b>1</b><span>Coloque a caixa (ou o adesivo impresso) numa mesa bem iluminada.</span></li>
       <li><b>2</b><span>Toque em "Abrir câmera" e permita o acesso.</span></li>
@@ -140,6 +159,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:28px;color:var(
     <div class="levels" id="levels"></div>
     <button class="btn primary" id="go" type="button">Abrir câmera</button>
     <p class="err" id="startErr" hidden></p>
+    <p class="note" id="lvlNote"></p>
     <p class="note">Ingrediente queimado: deslize para baixo. Errar a pizza custa uma vida. Modelos 3D: KayKit, de Kay Lousberg (CC0).</p>
   </div>
 </section>
@@ -156,6 +176,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:28px;color:var(
       <button class="btn primary" id="eAgain" type="button">Jogar de novo</button>
     </div>
     <button class="btn" id="eNext" type="button" hidden>Próximo nível</button>
+    <p class="info warn" id="eLock" hidden></p>
   </div>
 </section>
 
@@ -193,16 +214,101 @@ const KEY = 'monte-a-pizza-ar-v1';
 let P = {unlocked:1, stars:{}, best:{}};
 try{ P = Object.assign(P, JSON.parse(localStorage.getItem(KEY)) || {}); }catch(e){}
 const saveP = () => { try{ localStorage.setItem(KEY, JSON.stringify(P)); }catch(e){} };
-let selLevel = Math.min(P.unlocked, 10);
+/* ===== Cartão fidelidade na nuvem ===== */
+const CFG = window.PIZZA_CONFIG || {};
+const SB = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+const TOKEN = (new URLSearchParams(location.search).get('s') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+const LS = { get:k => { try{ return localStorage.getItem('mp-' + k); }catch(e){ return null; } }, set:(k, v) => { try{ localStorage.setItem('mp-' + k, v); }catch(e){} } };
+let ACC = null;
+const unlocked = () => SB ? (ACC ? ACC.unlocked : 1) : P.unlocked;
+const fmtPhone = p => p && p.length >= 10 ? '(' + p.slice(0,2) + ') ' + p.slice(2, p.length - 4) + '-' + p.slice(-4) : (p || '');
+const escH = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function call(fn, args){ const { data, error } = await SB.rpc(fn, args); if(error) throw new Error(error.message); return data; }
+function setAcc(r){
+  ACC = r; if(r.secret) LS.set('secret', r.secret);
+  if(selLevel > unlocked()) selLevel = unlocked();
+}
+function dotsHTML(points, goal){ let h = ''; for(let i=0;i<goal;i++) h += '<i class="' + (i < Math.min(points, goal) ? 'on' : '') + '"></i>'; return '<div class="dots">' + h + '</div>'; }
+function renderAcct(msgHTML, showForm){
+  const box = $('acct');
+  if(!SB){ box.hidden = false; box.innerHTML = '<span class="demo">Modo demonstração: pontos guardados só neste celular</span>'; return; }
+  box.hidden = false;
+  let h = '';
+  if(ACC){
+    const goal = ACC.reward_goal || 10;
+    $('pzEyebrow').textContent = ACC.pizzeria + ' · cartão fidelidade';
+    h += '<div class="hd"><b>Cartão de ' + escH(ACC.name) + '</b><span>' + ACC.points + ' de ' + goal + ' pontos</span></div>' + dotsHTML(ACC.points, goal);
+    if(ACC.points >= goal) h += '<p class="info good">Você ganhou uma pizza grátis! Peça na ' + escH(ACC.pizzeria) + ' e informe seu celular.</p>';
+  }
+  if(msgHTML) h += msgHTML;
+  if(showForm){
+    h += '<form class="claim" id="claimForm" novalidate>' +
+      '<label for="cName">Seu nome<input id="cName" autocomplete="name" value="' + escH(LS.get('name') || '') + '" placeholder="Seu nome"></label>' +
+      '<label for="cPhone">Celular (WhatsApp)<input id="cPhone" autocomplete="tel" inputmode="tel" value="' + escH(fmtPhone(LS.get('phone') || '')) + '" placeholder="(41) 99999-9999"></label>' +
+      '<button class="btn primary" type="submit" id="cGo">' + (showForm === 'login' ? 'Entrar com meu celular' : 'Registrar minha pizza') + '</button>' +
+      '<p class="err" id="cErr" hidden></p></form>';
+  }
+  box.innerHTML = h;
+  if(showForm) $('claimForm').addEventListener('submit', e => { e.preventDefault(); doClaim(); });
+  const lb = $('ownLink'); if(lb) lb.onclick = () => renderAcct('<p class="info">Digite o celular que registrou este adesivo.</p>', 'login');
+  renderLevels();
+}
+async function doClaim(){
+  const name = $('cName').value.trim(), phone = $('cPhone').value.replace(/\D/g, '');
+  const err = t => { $('cErr').textContent = t; $('cErr').hidden = false; };
+  if(name.length < 2) return err('Digite seu nome.');
+  if(phone.length < 10 || phone.length > 11) return err('Digite o celular com DDD, por exemplo (41) 99999-9999.');
+  $('cGo').disabled = true; $('cGo').textContent = 'Registrando…';
+  try{
+    const r = await call('game_claim', {p_token:TOKEN, p_phone:phone, p_name:name});
+    LS.set('name', name); LS.set('phone', phone);
+    if(r.ok){
+      setAcc(r);
+      const fase = r.unlocked;
+      renderAcct(r.reason === 'novo'
+        ? '<p class="info good">Pizza registrada: +1 ponto! ' + (fase > 1 ? 'A fase ' + fase + ' foi liberada.' : '') + '</p>'
+        : '<p class="info good">Este adesivo já está no seu cartão.</p>', false);
+      return;
+    }
+    const m = {usado:'Este adesivo já foi registrado por outro celular. Você pode jogar a fase 1. Peça uma pizza para ganhar pontos e liberar as próximas fases.',
+      limite:'Muitos adesivos em pouco tempo. Tente de novo daqui a pouco.', telefone:'Celular inválido. Use DDD + número.', nome:'Digite seu nome.',
+      cancelado:'Este adesivo foi cancelado pela pizzaria.', invalido:'Este QR Code não é de um adesivo válido.'};
+    $('cGo').disabled = false; $('cGo').textContent = 'Registrar minha pizza';
+    err(m[r.reason] || 'Não foi possível registrar agora.');
+  }catch(e){ $('cGo').disabled = false; $('cGo').textContent = 'Registrar minha pizza'; err('Sem conexão com o servidor. Verifique a internet e tente de novo.'); }
+}
+async function initAccount(){
+  if(!SB){ renderAcct('', false); return; }
+  const secret = LS.get('secret');
+  try{
+    if(secret){ const r = await call('game_progress', {p_secret:secret}); if(r && r.ok) setAcc(r); }
+    if(!TOKEN){
+      renderAcct(ACC ? '' : '<p class="info">Escaneie o QR Code do adesivo da sua pizza para ganhar pontos. Sem adesivo, você pode jogar a fase 1.</p>', false);
+      return;
+    }
+    const info = await call('game_sticker_info', {p_token:TOKEN, p_secret:secret || null});
+    if(info.pizzeria) $('pzEyebrow').textContent = info.pizzeria + ' · cartão fidelidade';
+    if(info.status === 'novo') renderAcct('<p class="info">Você recebeu uma pizza com adesivo novo' + (info.pizzeria ? ' da ' + escH(info.pizzeria) : '') + '. Registre com seu celular para ganhar 1 ponto e liberar a próxima fase.</p>', 'claim');
+    else if(info.status === 'seu') renderAcct('<p class="info good">Este adesivo já está no seu cartão.</p>', false);
+    else if(info.status === 'usado') renderAcct('<p class="info warn">Este adesivo já foi registrado por outro celular. Você pode jogar a fase 1. Peça uma pizza' + (info.pizzeria ? ' na ' + escH(info.pizzeria) : '') + ' para ganhar pontos e liberar a fase 2.</p>' + (ACC ? '' : '<button type="button" class="linkbtn" id="ownLink">Este adesivo é meu e troquei de celular</button>'), false);
+    else if(info.status === 'cancelado') renderAcct('<p class="info bad">Este adesivo foi cancelado pela pizzaria.</p>', false);
+    else renderAcct('<p class="info bad">Este QR Code não é de um adesivo válido.</p>', false);
+  }catch(e){ renderAcct('<p class="info bad">Sem conexão com o servidor. Você pode jogar a fase 1.</p>', false); }
+}
+let selLevel = Math.min(SB ? 1 : P.unlocked, 10);
 
-function renderLevels(){
+function lvlNote(){
+  const u = unlocked(), el = $('lvlNote'); if(!el) return;
+  el.textContent = u >= 10 ? 'Todas as 10 fases liberadas.' : SB ? 'Fases liberadas: ' + u + ' de 10. Cada pizza com adesivo libera a próxima.' : 'Vença uma fase para liberar a próxima.';
+}
+function renderLevels(){ lvlNote();
   $('levels').innerHTML = LEVELS.map((L, i) => {
-    const n = i + 1, open = n <= P.unlocked, st = P.stars[n] || 0;
+    const n = i + 1, open = n <= unlocked(), st = P.stars[n] || 0;
     return '<button type="button" class="lvl' + (open ? '' : ' locked') + (n === selLevel ? ' sel' : '') + '" data-n="' + n + '" aria-label="Nível ' + n + ', ' + L.name + (open ? '' : ', trancado') + '"><span class="n">' + n + '</span><span class="st">' + (st ? '★'.repeat(st) : '') + '</span></button>';
   }).join('');
 }
-$('levels').addEventListener('click', e => { const b = e.target.closest('.lvl'); if(!b) return; const n = +b.dataset.n; if(n <= P.unlocked){ selLevel = n; renderLevels(); } });
-renderLevels();
+$('levels').addEventListener('click', e => { const b = e.target.closest('.lvl'); if(!b) return; const n = +b.dataset.n; if(n <= unlocked()){ selLevel = n; renderLevels(); } });
+renderLevels(); initAccount();
 
 /* ================= Modelos ================= */
 let SCENES = null;
@@ -550,7 +656,8 @@ function finish(won){
   mode = 'end';
   const lb = won ? G.lives*300 : 0, base = G.score; G.score += lb;
   const stars = won ? G.lives : 0;
-  if(won && G.lvl + 1 > P.unlocked) P.unlocked = Math.min(10, G.lvl + 1);
+  if(won && !SB && G.lvl + 1 > P.unlocked) P.unlocked = Math.min(10, G.lvl + 1);
+  if(won && SB && LS.get('secret')) call('game_level_done', {p_secret:LS.get('secret'), p_level:G.lvl}).catch(() => {});
   if(stars > (P.stars[G.lvl] || 0)) P.stars[G.lvl] = stars;
   if(G.score > (P.best[G.lvl] || 0)) P.best[G.lvl] = G.score;
   saveP();
@@ -563,7 +670,10 @@ function finish(won){
   const lines = [['Ingredientes na pizza (' + G.hits + ' de ' + total + ')', base.toLocaleString('pt-BR')], ['Acertos no anel dourado', String(G.perfects)], ['Maior combo', '×' + Math.min(5, G.best)]];
   if(won) lines.push(['Bônus de vidas (' + G.lives + ' × 300)', lb.toLocaleString('pt-BR')]);
   $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
-  $('eNext').hidden = !(won && G.lvl < 10);
+  const canNext = won && G.lvl < 10 && G.lvl + 1 <= unlocked();
+  $('eNext').hidden = !canNext;
+  $('eLock').hidden = !(won && G.lvl < 10 && !canNext);
+  $('eLock').textContent = 'A fase ' + (G.lvl + 1) + ' libera quando você registrar o adesivo da sua próxima pizza.';
   $('end').hidden = false;
 }
 $('eAgain').addEventListener('click', () => startLevel(G.lvl));

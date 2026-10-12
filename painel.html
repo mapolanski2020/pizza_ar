@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Painel Monte a Pizza</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Figtree:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Layout: barra de navegação no topo (abas), conteúdo em coluna larga; ficha do cliente abre como painel lateral */
+:root{
+  --bg:#f7f1e8; --card:#fffdf9; --ink:#2a1d15; --muted:#7a6a5d; --line:#e7dccd; --soft:#f1e7d9;
+  --ember:#d9502a; --ember-ink:#fff8f0; --crust:#b9792e; --good:#3f8a3a; --good-soft:#e3f1dd; --bad:#c23b2f; --bad-soft:#f8e1dd;
+  --display:'Shrikhand', Georgia, serif; --body:'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#1a120d; --card:#241912; --ink:#f4ebdf; --muted:#b8a796; --line:#3a2a1f; --soft:#2e2118;
+  --ember:#e8653b; --ember-ink:#1a120d; --crust:#e3a85a; --good:#7cc472; --good-soft:#1f3320; --bad:#ef7a6d; --bad-soft:#3a1d19; color-scheme:dark } }
+:root[data-theme="dark"]{ --bg:#1a120d; --card:#241912; --ink:#f4ebdf; --muted:#b8a796; --line:#3a2a1f; --soft:#2e2118;
+  --ember:#e8653b; --ember-ink:#1a120d; --crust:#e3a85a; --good:#7cc472; --good-soft:#1f3320; --bad:#ef7a6d; --bad-soft:#3a1d19; color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14.5px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px}
+h1,h2,h3{margin:0;text-wrap:balance}
+.brand{font-family:var(--display);color:var(--ember);font-size:22px;line-height:1}
+.muted{color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 14px;font-weight:700}
+.btn.primary{background:var(--ember);border-color:var(--ember);color:var(--ember-ink)}
+.btn.good{background:var(--good);border-color:var(--good);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:6px 10px;font-size:13px}
+a.btn{text-decoration:none;color:inherit;display:inline-block}
+input,select{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;width:100%}
+label{display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px}
+.msg{min-height:1.2em;margin:0;font-size:13.5px}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
+
+/* Login */
+.auth{min-height:100vh;display:grid;place-items:center;padding:24px 16px}
+.auth .card{width:min(420px,100%);display:flex;flex-direction:column;gap:14px;padding:26px}
+.auth h1{font-family:var(--display);font-weight:400;color:var(--ember);font-size:34px}
+.tabs2{display:flex;gap:4px;background:var(--soft);border-radius:12px;padding:4px}
+.tabs2 button{flex:1;border:none;background:none;border-radius:9px;padding:8px;font-weight:700;color:var(--muted)}
+.tabs2 button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+/* App */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:16px;padding-block:12px;flex-wrap:wrap}
+.who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px}
+.nav{display:flex;gap:4px;overflow-x:auto}
+.nav button{border:none;background:none;padding:8px 12px;border-radius:9px;font-weight:700;color:var(--muted);white-space:nowrap}
+.nav button.on{background:var(--card);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+main{padding-block:22px 60px}
+.sec-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.sec-head h2{font-size:24px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.kpi .k{font-size:12px;font-weight:700;color:var(--muted)}
+.kpi .v{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.alert .v{color:var(--bad)}
+.kpi.goodk .v{color:var(--good)}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:12px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.chart svg{width:100%;height:auto;display:block}
+.feed{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.feed li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px}
+.feed li:last-child{border-bottom:none}
+.tag{flex:none;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted);letter-spacing:.02em}
+.tag.ponto{background:var(--good-soft);color:var(--good)}
+.tag.resgate{background:#fbe9c9;color:#8a5a12}
+.tag.bloq{background:var(--bad-soft);color:var(--bad)}
+.feed time{margin-left:auto;color:var(--muted);font-size:12px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:12px;color:var(--muted);font-weight:700;background:var(--soft)}
+tbody tr{cursor:default}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:var(--soft)}
+td.num{font-variant-numeric:tabular-nums}
+.bar{display:inline-flex;align-items:center;gap:8px}
+.bar i{display:block;width:90px;height:8px;border-radius:99px;background:var(--soft);position:relative;overflow:hidden}
+.bar i b{position:absolute;inset:0 auto 0 0;background:var(--crust);border-radius:99px}
+.bar.full i b{background:var(--good)}
+.pill{font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:999px}
+.pill.ready{background:var(--good-soft);color:var(--good)}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toolbar input{max-width:320px}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.formrow{display:grid;grid-template-columns:120px 1fr 220px auto;gap:10px;align-items:end}
+@media (max-width:760px){.formrow{grid-template-columns:1fr 1fr}}
+.code{font-family:ui-monospace,Menlo,monospace;font-size:22px;font-weight:800;letter-spacing:.12em;background:var(--soft);border-radius:10px;padding:8px 14px;display:inline-block}
+
+/* Ficha do cliente */
+.drawer{position:fixed;inset:0;z-index:20;display:flex;justify-content:flex-end;background:rgba(20,12,8,.35)}
+.drawer .in{width:min(460px,100%);height:100%;overflow:auto;background:var(--card);border-left:1px solid var(--line);padding:22px;display:flex;flex-direction:column;gap:16px}
+.drawer h3{font-size:22px}
+.prog{height:12px;border-radius:99px;background:var(--soft);overflow:hidden}
+.prog b{display:block;height:100%;background:var(--crust)}
+.prog.full b{background:var(--good)}
+.hist{list-style:none;margin:0;padding:0;font-size:13.5px}
+.hist li{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.confirm{border:1px solid var(--good);background:var(--good-soft);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+
+/* Impressão de adesivos */
+.printer{position:fixed;inset:0;z-index:30;background:var(--bg);overflow:auto}
+.printer .bar2{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:12px 20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sheets{padding:20px;display:flex;flex-direction:column;align-items:center;gap:20px}
+.page{background:#fff;color:#1c130e;box-shadow:0 4px 18px rgba(0,0,0,.12)}
+.page.a4{width:210mm;height:297mm;padding:12mm;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8mm}
+.page.label{width:100mm;height:150mm;padding:4mm}
+.stk{border:.3mm dashed #bbb;border-radius:4mm;padding:4mm;display:flex;flex-direction:column;gap:3mm;overflow:hidden}
+.page.label .stk{height:100%}
+.stk .art{width:100%;aspect-ratio:1;display:block}
+.stk .low{display:flex;gap:3mm;align-items:center}
+.stk .qr{width:32mm;height:32mm;image-rendering:pixelated;flex:none}
+.page.label .stk .qr{width:36mm;height:36mm}
+.stk .txt{display:flex;flex-direction:column;gap:1mm;font-size:3.2mm;font-weight:700;line-height:1.25}
+.stk .txt .hl{color:#d9502a}
+.stk .txt .ser{margin-top:1.5mm;font-family:ui-monospace,Menlo,monospace;font-size:3mm;color:#555}
+@media print{
+  @page{margin:0}
+  body *{visibility:hidden}
+  .printer,.printer *{visibility:visible}
+  .printer{position:absolute;inset:0;background:#fff;overflow:visible}
+  .printer .bar2{display:none}
+  .sheets{padding:0;gap:0}
+  .page{box-shadow:none;break-after:page}
+  .page.label{width:100mm;height:150mm}
+}
+.setup{max-width:640px;margin:60px auto;padding-inline:20px}
+.setup ol{line-height:1.7}
+</style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+</head>
+<body>
+
+<div id="setup" class="setup" hidden>
+  <div class="card">
+    <h2>Falta ligar a nuvem</h2>
+    <p>O arquivo <b>config.js</b> ainda está sem os dados do Supabase. Siga o passo a passo do arquivo <b>README.md</b> do repositório e preencha <code>SUPABASE_URL</code> e <code>SUPABASE_ANON_KEY</code>.</p>
+  </div>
+</div>
+
+<section id="auth" class="auth" hidden>
+  <div class="card">
+    <span class="brand">Monte a Pizza</span>
+    <h1>Painel da pizzaria</h1>
+    <div class="tabs2" role="tablist">
+      <button type="button" class="on" id="tabLogin">Entrar</button>
+      <button type="button" id="tabSignup">Criar acesso</button>
+    </div>
+    <form id="fLogin" style="display:flex;flex-direction:column;gap:12px">
+      <label for="lEmail">E-mail<input id="lEmail" type="email" autocomplete="email" required></label>
+      <label for="lPass">Senha<input id="lPass" type="password" autocomplete="current-password" required></label>
+      <button class="btn primary" type="submit">Entrar</button>
+    </form>
+    <form id="fSignup" style="display:flex;flex-direction:column;gap:12px" hidden>
+      <label for="sName">Seu nome<input id="sName" autocomplete="name" required></label>
+      <label for="sEmail">E-mail<input id="sEmail" type="email" autocomplete="email" required></label>
+      <label for="sPass">Senha (mínimo 6 caracteres)<input id="sPass" type="password" autocomplete="new-password" minlength="6" required></label>
+      <label for="sCode">Código da equipe<input id="sCode" autocomplete="off" placeholder="Ex.: 47EADE7C" required style="text-transform:uppercase;letter-spacing:.1em"></label>
+      <button class="btn primary" type="submit">Criar acesso</button>
+    </form>
+    <p class="msg" id="authMsg" aria-live="polite"></p>
+  </div>
+</section>
+
+<section id="join" class="auth" hidden>
+  <div class="card">
+    <span class="brand">Monte a Pizza</span>
+    <h1>Entrar na equipe</h1>
+    <p class="muted" style="margin:0">Digite o código da equipe que o dono da pizzaria recebeu.</p>
+    <form id="fJoin" style="display:flex;flex-direction:column;gap:12px">
+      <label for="jName">Seu nome<input id="jName" required></label>
+      <label for="jCode">Código da equipe<input id="jCode" required style="text-transform:uppercase;letter-spacing:.1em"></label>
+      <button class="btn primary" type="submit">Entrar na equipe</button>
+    </form>
+    <p class="msg" id="joinMsg" aria-live="polite"></p>
+    <button class="btn sm" type="button" id="joinOut">Sair</button>
+  </div>
+</section>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="wrap">
+      <span class="brand" id="pzName">Pizzaria</span>
+      <nav class="nav" aria-label="Seções">
+        <button type="button" data-v="overview" class="on">Visão geral</button>
+        <button type="button" data-v="customers">Clientes</button>
+        <button type="button" data-v="stickers">Adesivos</button>
+        <button type="button" data-v="rewards">Pizzas grátis</button>
+        <button type="button" data-v="team">Equipe</button>
+      </nav>
+      <div class="who"><span id="meName" class="muted"></span><button class="btn sm" type="button" id="logout">Sair</button></div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section data-view="overview">
+      <div class="sec-head"><div><h2>Visão geral</h2><p class="muted" style="margin:4px 0 0">Tudo o que aconteceu com o cartão fidelidade da sua pizzaria.</p></div><button class="btn sm" type="button" id="refresh">Atualizar</button></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="grid2">
+        <div class="card chart"><h3 style="font-size:16px;margin-bottom:10px" id="chartTitle">Pizzas comprovadas por dia</h3><div id="chart"></div></div>
+        <div class="card"><h3 style="font-size:16px;margin-bottom:6px">Atividade recente</h3><ul class="feed" id="feed"></ul></div>
+      </div>
+    </section>
+
+    <section data-view="customers" hidden>
+      <div class="sec-head"><div><h2>Clientes</h2><p class="muted" style="margin:4px 0 0">Cada cliente é identificado pelo celular. Toque numa linha para ver a ficha e as provas de cada ponto.</p></div>
+        <div class="toolbar"><input id="search" type="search" placeholder="Buscar por nome ou celular" aria-label="Buscar cliente"><button class="btn sm" type="button" id="csv">Exportar planilha</button></div></div>
+      <div class="tablewrap"><table><thead><tr><th>Cliente</th><th>Celular</th><th>Pizzas</th><th>Pontos</th><th>Pizzas grátis</th><th>Última compra</th></tr></thead><tbody id="custBody"></tbody></table></div>
+    </section>
+
+    <section data-view="stickers" hidden>
+      <div class="sec-head"><div><h2>Adesivos</h2><p class="muted" style="margin:4px 0 0">Cada adesivo tem um QR Code único, vale 1 pizza e só pode ser usado por um celular.</p></div></div>
+      <div class="card" style="margin-bottom:14px">
+        <form id="fBatch" class="formrow">
+          <label for="bQty">Quantidade<input id="bQty" type="number" min="1" max="1000" value="40" required></label>
+          <label for="bLabel">Nome do lote<input id="bLabel" placeholder="Ex.: Novembro, rolo 1"></label>
+          <label for="bFmt">Formato de impressão<select id="bFmt"><option value="a4">Folha A4 (4 por folha)</option><option value="label">Etiqueta 100×150 mm</option></select></label>
+          <button class="btn primary" type="submit">Gerar e imprimir</button>
+        </form>
+        <p class="msg" id="batchMsg" aria-live="polite"></p>
+      </div>
+      <div class="tablewrap" style="margin-bottom:14px"><table><thead><tr><th>Lote</th><th>Números</th><th>Novos</th><th>Usados</th><th>Cancelados</th><th>Criado em</th><th></th></tr></thead><tbody id="batchBody"></tbody></table></div>
+      <div class="card">
+        <h3 style="font-size:16px;margin-bottom:6px">Cancelar adesivo perdido</h3>
+        <p class="muted" style="margin:0 0 10px">Se um adesivo sumiu ou foi entregue sem pizza, cancele pelo número impresso nele. Ele deixa de valer na hora.</p>
+        <form id="fCancel" class="toolbar"><input id="cSerial" type="number" min="1" placeholder="Número do adesivo" aria-label="Número do adesivo" style="max-width:200px" required><button class="btn" type="submit">Cancelar adesivo</button></form>
+        <p class="msg" id="cancelMsg" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section data-view="rewards" hidden>
+      <div class="sec-head"><div><h2>Pizzas grátis entregues</h2><p class="muted" style="margin:4px 0 0">Para entregar uma pizza grátis, abra a ficha do cliente em Clientes.</p></div></div>
+      <div class="tablewrap"><table><thead><tr><th>Data</th><th>Cliente</th><th>Celular</th><th>Atendente</th><th>Observação</th></tr></thead><tbody id="rewBody"></tbody></table></div>
+    </section>
+
+    <section data-view="team" hidden>
+      <div class="sec-head"><div><h2>Equipe</h2></div></div>
+      <div class="card" style="margin-bottom:14px" id="codeCard">
+        <h3 style="font-size:16px;margin-bottom:6px">Código da equipe</h3>
+        <p class="muted" style="margin:0 0 10px">Passe este código para os atendentes criarem o acesso deles ao painel.</p>
+        <span class="code" id="joinCode">--------</span>
+      </div>
+      <div class="tablewrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Desde</th></tr></thead><tbody id="teamBody"></tbody></table></div>
+    </section>
+  </main>
+</div>
+
+<div class="drawer" id="drawer" hidden><div class="in" id="drawerIn" role="dialog" aria-modal="true" aria-labelledby="dName"></div></div>
+
+<div class="printer" id="printer" hidden>
+  <div class="bar2"><b id="prTitle">Adesivos</b><span class="muted" id="prInfo"></span><span style="margin-left:auto"></span><button class="btn primary" type="button" id="prPrint">Imprimir</button><button class="btn" type="button" id="prClose">Fechar</button></div>
+  <div class="sheets" id="sheets"></div>
+</div>
+
+<script>
+(function(){
+'use strict';
+const $ = id => document.getElementById(id);
+const CFG = window.PIZZA_CONFIG || {};
+if(!CFG.SUPABASE_URL || !CFG.SUPABASE_ANON_KEY){ $('setup').hidden = false; return; }
+const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtPhone = p => p && p.length >= 10 ? '(' + p.slice(0,2) + ') ' + p.slice(2, p.length - 4) + '-' + p.slice(-4) : (p || '');
+const fmtDate = d => d ? new Date(d).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
+const fmtDay = d => d ? new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric'}) : '—';
+const n = v => Number(v || 0).toLocaleString('pt-BR');
+let ME = null;
+
+async function rpc(name, args){
+  const { data, error } = await sb.rpc(name, args || {});
+  if(error) throw new Error(error.message);
+  return data;
+}
+
+/* ---------- Acesso ---------- */
+function showAuth(msg){ ['app','join'].forEach(id => $(id).hidden = true); $('auth').hidden = false; $('authMsg').textContent = msg || ''; $('authMsg').className = 'msg' + (msg ? ' err' : ''); }
+$('tabLogin').onclick = () => { $('tabLogin').classList.add('on'); $('tabSignup').classList.remove('on'); $('fLogin').hidden = false; $('fSignup').hidden = true; $('authMsg').textContent = ''; };
+$('tabSignup').onclick = () => { $('tabSignup').classList.add('on'); $('tabLogin').classList.remove('on'); $('fSignup').hidden = false; $('fLogin').hidden = true; $('authMsg').textContent = ''; };
+$('fLogin').addEventListener('submit', async e => {
+  e.preventDefault();
+  const { error } = await sb.auth.signInWithPassword({ email:$('lEmail').value.trim(), password:$('lPass').value });
+  if(error) return showAuth(error.message.includes('Invalid') ? 'E-mail ou senha incorretos.' : error.message.includes('not confirmed') ? 'Confirme o e-mail pelo link que enviamos e tente de novo.' : error.message);
+  boot();
+});
+$('fSignup').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('sName').value.trim(), code = $('sCode').value.trim().toUpperCase();
+  try{ localStorage.setItem('mp-pending-join', JSON.stringify({name, code})); }catch(err){}
+  const { data, error } = await sb.auth.signUp({ email:$('sEmail').value.trim(), password:$('sPass').value });
+  if(error) return showAuth(error.message.includes('registered') ? 'Esse e-mail já tem acesso. Use a aba Entrar.' : error.message);
+  if(!data.session){ $('authMsg').className = 'msg ok'; $('authMsg').textContent = 'Acesso criado. Confirme o e-mail pelo link que enviamos e depois entre pela aba Entrar.'; return; }
+  boot();
+});
+$('fJoin').addEventListener('submit', async e => {
+  e.preventDefault();
+  try{
+    const r = await rpc('staff_join', { p_code:$('jCode').value.trim().toUpperCase(), p_name:$('jName').value.trim() });
+    if(!r.ok){ $('joinMsg').className = 'msg err'; $('joinMsg').textContent = 'Código não encontrado. Confira com o dono da pizzaria.'; return; }
+    boot();
+  }catch(err){ $('joinMsg').className = 'msg err'; $('joinMsg').textContent = err.message; }
+});
+$('joinOut').onclick = $('logout').onclick = async () => { await sb.auth.signOut(); showAuth(''); };
+
+async function boot(){
+  const { data } = await sb.auth.getSession();
+  if(!data.session) return showAuth('');
+  let me = await rpc('staff_me').catch(() => ({ok:false}));
+  if(!me.ok){
+    let pending = null; try{ pending = JSON.parse(localStorage.getItem('mp-pending-join')); }catch(e){}
+    if(pending && pending.code){
+      const r = await rpc('staff_join', {p_code:pending.code, p_name:pending.name}).catch(() => null);
+      try{ localStorage.removeItem('mp-pending-join'); }catch(e){}
+      if(r && r.ok) me = await rpc('staff_me');
+    }
+  }
+  if(!me.ok){ ['app','auth'].forEach(id => $(id).hidden = true); $('join').hidden = false; return; }
+  ME = me;
+  ['auth','join'].forEach(id => $(id).hidden = true); $('app').hidden = false;
+  $('pzName').textContent = me.pizzeria; $('meName').textContent = me.name + ' · ' + (me.role === 'dono' ? 'dono' : 'atendente');
+  document.title = 'Painel ' + me.pizzeria;
+  show(location.hash.slice(1) || 'overview');
+}
+
+/* ---------- Navegação ---------- */
+const VIEWS = ['overview','customers','stickers','rewards','team'];
+function show(v){
+  if(!VIEWS.includes(v)) v = 'overview';
+  document.querySelectorAll('[data-view]').forEach(s => s.hidden = s.dataset.view !== v);
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  history.replaceState(null, '', '#' + v);
+  ({overview:loadOverview, customers:loadCustomers, stickers:loadBatches, rewards:loadRewards, team:loadTeam})[v]();
+}
+document.querySelectorAll('.nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+$('refresh').onclick = loadOverview;
+
+/* ---------- Visão geral ---------- */
+const KIND = {ponto:['Pizza','ponto'], resgate:['Grátis','resgate'], reuso_bloqueado:['Bloqueado','bloq'], limite:['Limite','bloq'], lote:['Lote',''], cancelado:['Cancelado','']};
+function feedText(e){
+  if(e.kind === 'ponto') return '<b>' + esc(e.customer || fmtPhone(e.phone)) + '</b> registrou a pizza do adesivo nº ' + e.sticker_serial + ' (' + (e.detail.pontos || '') + ' pontos)';
+  if(e.kind === 'resgate') return '<b>' + esc(e.customer) + '</b> recebeu uma pizza grátis' + (e.detail.atendente ? ' (' + esc(e.detail.atendente) + ')' : '');
+  if(e.kind === 'reuso_bloqueado') return 'O celular ' + fmtPhone(e.phone) + ' tentou usar o adesivo nº ' + e.sticker_serial + ', que já era de outro cliente';
+  if(e.kind === 'limite') return 'O celular ' + fmtPhone(e.phone) + ' passou do limite de adesivos por hora';
+  if(e.kind === 'lote') return 'Lote de ' + e.detail.qtd + ' adesivos gerado (nº ' + e.detail.de + ' a ' + e.detail.ate + ')';
+  if(e.kind === 'cancelado') return 'Adesivo nº ' + e.sticker_serial + ' cancelado';
+  return esc(e.kind);
+}
+async function loadOverview(){
+  try{
+    const [o, ev] = await Promise.all([rpc('staff_overview'), rpc('staff_events', {p_limit:30})]);
+    const tiles = [
+      ['Clientes cadastrados', n(o.customers), 'identificados pelo celular', ''],
+      ['Pizzas comprovadas', n(o.orders), 'adesivos registrados', ''],
+      ['Prontos para pizza grátis', n(o.ready), 'com ' + ME.reward_goal + ' pontos ou mais', o.ready ? 'goodk' : ''],
+      ['Pizzas grátis entregues', n(o.rewards), 'desde o início', ''],
+      ['Adesivos em estoque', n(o.stickers_new), n(o.stickers_used) + ' usados · ' + n(o.stickers_void) + ' cancelados', ''],
+      ['Tentativas bloqueadas', n(o.blocked_7d), 'nos últimos 7 dias', o.blocked_7d ? 'alert' : '']
+    ];
+    $('kpis').innerHTML = tiles.map(t => '<div class="kpi ' + t[3] + '"><div class="k">' + t[0] + '</div><div class="v">' + t[1] + '</div><div class="s">' + t[2] + '</div></div>').join('');
+    drawChart(o.daily || []);
+    $('feed').innerHTML = ev.length ? ev.map(e => { const k = KIND[e.kind] || [e.kind, '']; return '<li><span class="tag ' + k[1] + '">' + k[0] + '</span><span>' + feedText(e) + '</span><time>' + fmtDate(e.created_at) + '</time></li>'; }).join('') : '<li class="empty">Nenhuma atividade ainda. Gere o primeiro lote de adesivos na aba Adesivos.</li>';
+  }catch(err){ $('kpis').innerHTML = '<p class="msg err">' + esc(err.message) + '</p>'; }
+}
+function drawChart(rows){
+  const total = rows.reduce((a, r) => a + r.n, 0);
+  $('chartTitle').textContent = total + (total === 1 ? ' pizza comprovada' : ' pizzas comprovadas') + ' nos últimos 14 dias';
+  const W = 640, H = 220, L = 30, B = 28, T = 14, max = Math.max(4, ...rows.map(r => r.n));
+  const step = Math.ceil(max/4), top = step*4, bw = (W - L - 10)/rows.length;
+  const y = v => H - B - v/top*(H - B - T);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Pizzas comprovadas por dia nos últimos 14 dias">';
+  for(let i=0;i<=4;i++){ const v = i*step; s += '<line x1="' + L + '" x2="' + (W - 6) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--line)"/><text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="var(--muted)">' + v + '</text>'; }
+  rows.forEach((r, i) => {
+    const x = L + i*bw + bw*.18, w = bw*.64, d = new Date(r.day + 'T12:00:00');
+    s += '<rect x="' + x + '" y="' + y(r.n) + '" width="' + w + '" height="' + (H - B - y(r.n)) + '" rx="3" fill="' + (i === rows.length - 1 ? 'var(--ember)' : 'var(--crust)') + '"><title>' + d.toLocaleDateString('pt-BR') + ': ' + r.n + '</title></rect>';
+    if(r.n) s += '<text x="' + (x + w/2) + '" y="' + (y(r.n) - 4) + '" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink)">' + r.n + '</text>';
+    if(i % 2 === rows.length % 2 || i === rows.length - 1) s += '<text x="' + (x + w/2) + '" y="' + (H - 9) + '" text-anchor="middle" font-size="11" fill="var(--muted)">' + d.getDate() + '/' + (d.getMonth() + 1) + '</text>';
+  });
+  $('chart').innerHTML = s + '</svg>';
+}
+
+/* ---------- Clientes ---------- */
+let CUST = [], searchT = 0;
+$('search').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(loadCustomers, 250); });
+async function loadCustomers(){
+  try{
+    CUST = await rpc('staff_customers', {p_search:$('search').value});
+    const g = ME.reward_goal;
+    $('custBody').innerHTML = CUST.length ? CUST.map(c => {
+      const pct = Math.min(100, c.points/g*100), full = c.points >= g;
+      return '<tr class="click" data-id="' + c.id + '" tabindex="0"><td><b>' + esc(c.name) + '</b>' + (full ? ' <span class="pill ready">Pizza grátis</span>' : '') + '</td><td class="num">' + fmtPhone(c.phone) + '</td><td class="num">' + c.total_orders + '</td><td><span class="bar' + (full ? ' full' : '') + '"><i><b style="width:' + pct + '%"></b></i><span class="num">' + c.points + '/' + g + '</span></span></td><td class="num">' + c.rewards_redeemed + '</td><td class="num">' + fmtDate(c.last_order_at) + '</td></tr>';
+    }).join('') : '<tr><td colspan="6" class="empty">' + ($('search').value ? 'Nenhum cliente encontrado.' : 'Ainda não há clientes. Eles aparecem aqui quando registram o primeiro adesivo.') + '</td></tr>';
+  }catch(err){ $('custBody').innerHTML = '<tr><td colspan="6" class="msg err">' + esc(err.message) + '</td></tr>'; }
+}
+$('custBody').addEventListener('click', e => { const tr = e.target.closest('tr[data-id]'); if(tr) openCustomer(tr.dataset.id); });
+$('custBody').addEventListener('keydown', e => { const tr = e.target.closest('tr[data-id]'); if(tr && e.key === 'Enter') openCustomer(tr.dataset.id); });
+$('csv').onclick = () => {
+  const rows = [['Nome','Celular','Pizzas comprovadas','Pontos','Pizzas grátis','Cadastro','Última compra']].concat(CUST.map(c => [c.name, c.phone, c.total_orders, c.points, c.rewards_redeemed, fmtDay(c.created_at), fmtDay(c.last_order_at)]));
+  const csv = '﻿' + rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'})); a.download = 'clientes-' + new Date().toISOString().slice(0,10) + '.csv'; a.click();
+};
+async function openCustomer(id){
+  const d = $('drawerIn'); d.innerHTML = '<p class="muted">Carregando…</p>'; $('drawer').hidden = false;
+  try{
+    const r = await rpc('staff_customer', {p_id:id});
+    if(!r.ok){ d.innerHTML = '<p class="msg err">Cliente não encontrado.</p>'; return; }
+    const c = r.customer, g = ME.reward_goal, full = c.points >= g;
+    d.innerHTML =
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:start"><div><h3 id="dName">' + esc(c.name) + '</h3><div class="muted">' + fmtPhone(c.phone) + ' · cliente desde ' + fmtDay(c.created_at) + '</div></div><button class="btn sm" type="button" id="dClose">Fechar</button></div>' +
+      '<div><div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:6px"><span>Cartão fidelidade</span><span class="num">' + c.points + ' de ' + g + ' pontos</span></div><div class="prog' + (full ? ' full' : '') + '"><b style="width:' + Math.min(100, c.points/g*100) + '%"></b></div></div>' +
+      '<div class="kpis" style="grid-template-columns:repeat(3,1fr);margin:0"><div class="kpi"><div class="k">Pizzas</div><div class="v">' + c.total_orders + '</div></div><div class="kpi"><div class="k">Grátis</div><div class="v">' + c.rewards_redeemed + '</div></div><div class="kpi' + (r.blocked ? ' alert' : '') + '"><div class="k">Bloqueios</div><div class="v">' + r.blocked + '</div></div></div>' +
+      '<div id="redeemBox">' + (full ? '<button class="btn good" type="button" id="dRedeem" style="width:100%">Entregar pizza grátis</button>' : '<p class="muted" style="margin:0">Faltam ' + (g - c.points) + ' pizzas para a próxima pizza grátis.</p>') + '</div>' +
+      '<div class="toolbar"><a class="btn sm" href="https://wa.me/55' + c.phone + '" target="_blank" rel="noopener">Abrir no WhatsApp</a><span class="muted" style="font-size:12px;user-select:all">' + fmtPhone(c.phone) + '</span></div>' +
+      '<div><h4 style="margin:0 0 4px">Provas de compra</h4><p class="muted" style="margin:0 0 6px;font-size:12.5px">Cada ponto veio de um adesivo único, registrado neste celular.</p><ul class="hist">' + (r.orders.length ? r.orders.map(o => '<li><span>Adesivo nº ' + o.serial + ' <span class="muted">· ' + esc(o.batch) + '</span></span><span class="num muted">' + fmtDate(o.claimed_at) + '</span></li>').join('') : '<li class="muted">Nenhuma ainda.</li>') + '</ul></div>' +
+      '<div><h4 style="margin:0 0 6px">Pizzas grátis recebidas</h4><ul class="hist">' + (r.rewards.length ? r.rewards.map(w => '<li><span>' + esc(w.staff || '') + (w.note ? ' <span class="muted">· ' + esc(w.note) + '</span>' : '') + '</span><span class="num muted">' + fmtDate(w.created_at) + '</span></li>').join('') : '<li class="muted">Nenhuma ainda.</li>') + '</ul></div>';
+    $('dClose').onclick = closeDrawer;
+    if(full) $('dRedeem').onclick = () => {
+      $('redeemBox').innerHTML = '<div class="confirm"><b>Confirmar a entrega de 1 pizza grátis para ' + esc(c.name) + '?</b><span style="font-size:13px">Serão descontados ' + g + ' pontos do cartão.</span><input id="dNote" placeholder="Observação (opcional), ex.: pedido 1234"><div class="toolbar"><button class="btn good" type="button" id="dYes">Confirmar entrega</button><button class="btn" type="button" id="dNo">Voltar</button></div></div>';
+      $('dNo').onclick = () => openCustomer(id);
+      $('dYes').onclick = async () => {
+        $('dYes').disabled = true;
+        const res = await rpc('staff_redeem', {p_customer:id, p_note:$('dNote').value}).catch(err => ({ok:false, reason:err.message}));
+        if(res.ok){ openCustomer(id); loadCustomers(); }
+        else $('redeemBox').insertAdjacentHTML('beforeend', '<p class="msg err">Não foi possível: ' + esc(res.reason === 'pontos' ? 'pontos insuficientes' : res.reason) + '</p>');
+      };
+    };
+  }catch(err){ d.innerHTML = '<p class="msg err">' + esc(err.message) + '</p>'; }
+}
+function closeDrawer(){ $('drawer').hidden = true; }
+$('drawer').addEventListener('click', e => { if(e.target === $('drawer')) closeDrawer(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeDrawer(); } });
+
+/* ---------- Adesivos ---------- */
+async function loadBatches(){
+  try{
+    const b = await rpc('staff_batches');
+    $('batchBody').innerHTML = b.length ? b.map(x => '<tr><td><b>' + esc(x.label) + '</b></td><td class="num">' + x.first_serial + ' a ' + x.last_serial + '</td><td class="num">' + x.novos + '</td><td class="num">' + x.usados + '</td><td class="num">' + x.cancelados + '</td><td class="num">' + fmtDay(x.created_at) + '</td><td><button class="btn sm" type="button" data-batch="' + x.id + '" data-label="' + esc(x.label) + '">Reimprimir novos</button></td></tr>').join('') : '<tr><td colspan="7" class="empty">Nenhum lote ainda.</td></tr>';
+  }catch(err){ $('batchBody').innerHTML = '<tr><td colspan="7" class="msg err">' + esc(err.message) + '</td></tr>'; }
+}
+$('batchBody').addEventListener('click', async e => {
+  const b = e.target.closest('[data-batch]'); if(!b) return;
+  const rows = (await rpc('staff_batch_stickers', {p_batch:b.dataset.batch})).filter(r => r.status === 'novo');
+  if(!rows.length){ $('batchMsg').className = 'msg'; $('batchMsg').textContent = 'Esse lote não tem adesivos novos para reimprimir.'; return; }
+  openPrinter(rows, b.dataset.label, $('bFmt').value);
+});
+$('fBatch').addEventListener('submit', async e => {
+  e.preventDefault();
+  const qty = +$('bQty').value, label = $('bLabel').value.trim() || ('Lote de ' + new Date().toLocaleDateString('pt-BR'));
+  $('batchMsg').className = 'msg'; $('batchMsg').textContent = 'Gerando ' + qty + ' adesivos…';
+  try{
+    const rows = await rpc('staff_create_batch', {p_qty:qty, p_label:label});
+    $('batchMsg').className = 'msg ok'; $('batchMsg').textContent = 'Lote criado: adesivos nº ' + rows[0].serial + ' a ' + rows[rows.length - 1].serial + '.';
+    loadBatches(); openPrinter(rows, label, $('bFmt').value);
+  }catch(err){ $('batchMsg').className = 'msg err'; $('batchMsg').textContent = err.message; }
+});
+$('fCancel').addEventListener('submit', async e => {
+  e.preventDefault();
+  const r = await rpc('staff_cancel_sticker', {p_serial:+$('cSerial').value}).catch(err => ({ok:false, reason:err.message}));
+  const m = {nao_encontrado:'Não existe adesivo com esse número.', usado:'Esse adesivo já foi usado por um cliente e não pode ser cancelado.', cancelado:'Esse adesivo já estava cancelado.'};
+  $('cancelMsg').className = 'msg ' + (r.ok ? 'ok' : 'err');
+  $('cancelMsg').textContent = r.ok ? 'Adesivo nº ' + $('cSerial').value + ' cancelado.' : (m[r.reason] || r.reason);
+  if(r.ok){ $('cSerial').value = ''; loadBatches(); }
+});
+function qrURL(token){
+  const q = qrcode(0, 'M'); q.addData((CFG.GAME_URL || location.href.replace(/painel\.html.*$/, '')) + '?s=' + token); q.make();
+  return q.createDataURL(8, 2);
+}
+function openPrinter(rows, label, fmt){
+  const per = fmt === 'a4' ? 4 : 1, pages = [];
+  for(let i=0;i<rows.length;i+=per) pages.push(rows.slice(i, i + per));
+  $('prTitle').textContent = label; $('prInfo').textContent = rows.length + ' adesivos · ' + pages.length + (pages.length === 1 ? ' página' : ' páginas') + ' · imprima em tamanho real (100%)';
+  $('sheets').innerHTML = pages.map(p => '<div class="page ' + fmt + '">' + p.map(r =>
+    '<div class="stk"><img class="art" src="adesivo-arte.png" alt=""><div class="low"><img class="qr" alt="QR Code do adesivo ' + r.serial + '" src="' + qrURL(r.token) + '"><div class="txt"><span>1. Escaneie o QR</span><span>2. Aponte a câmera para a pizza</span><span class="hl">3. Ganhe pontos!</span><span class="ser">' + esc(ME.prefix) + ' nº ' + String(r.serial).padStart(6, '0') + '</span></div></div></div>'
+  ).join('') + '</div>').join('');
+  $('printer').hidden = false;
+}
+$('prPrint').onclick = () => window.print();
+$('prClose').onclick = () => { $('printer').hidden = true; };
+
+/* ---------- Resgates e equipe ---------- */
+async function loadRewards(){
+  try{
+    const r = await rpc('staff_rewards');
+    $('rewBody').innerHTML = r.length ? r.map(x => '<tr><td class="num">' + fmtDate(x.created_at) + '</td><td><b>' + esc(x.customer) + '</b></td><td class="num">' + fmtPhone(x.phone) + '</td><td>' + esc(x.staff || '') + '</td><td>' + esc(x.note || '') + '</td></tr>').join('') : '<tr><td colspan="5" class="empty">Nenhuma pizza grátis entregue ainda.</td></tr>';
+  }catch(err){ $('rewBody').innerHTML = '<tr><td colspan="5" class="msg err">' + esc(err.message) + '</td></tr>'; }
+}
+async function loadTeam(){
+  $('codeCard').hidden = !ME.join_code; $('joinCode').textContent = ME.join_code || '';
+  try{
+    const t = await rpc('staff_team');
+    $('teamBody').innerHTML = t.map(x => '<tr><td><b>' + esc(x.name) + '</b></td><td>' + (x.role === 'dono' ? 'Dono' : 'Atendente') + '</td><td class="num">' + fmtDay(x.created_at) + '</td></tr>').join('');
+  }catch(err){ $('teamBody').innerHTML = '<tr><td colspan="3" class="msg err">' + esc(err.message) + '</td></tr>'; }
+}
+
+sb.auth.onAuthStateChange((ev) => { if(ev === 'SIGNED_OUT') showAuth(''); });
+boot();
+})();
+</script>
+</body>
+</html>
