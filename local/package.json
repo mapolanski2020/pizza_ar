@@ -1,0 +1,13 @@
+{
+  "name": "monte-a-pizza-local",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Servidor local do Monte a Pizza (jogo AR + CRM de fidelidade)",
+  "scripts": { "start": "node servidor.mjs" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "@electric-sql/pglite": "0.3.16",
+    "selfsigned": "2.4.1"
+  }
+}

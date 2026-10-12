@@ -13,6 +13,25 @@ libera a próxima fase. Quem escanear um adesivo já usado joga só a fase 1.
 | `adesivo-arte.png`, `targets.mind` | Arte do adesivo e marcador de AR |
 | `models.glb` | Ingredientes 3D (KayKit, de Kay Lousberg, CC0) |
 
+## Rodar no seu computador (sem nuvem)
+
+A pasta `local/` tem um servidor que faz o papel da nuvem: banco de dados,
+login do painel e as mesmas regras anti-trapaça. Os dados ficam em `local/dados`.
+
+1. Instale o **Node.js** (versão LTS) em https://nodejs.org.
+2. Abra a pasta `local` e dê dois cliques em **`iniciar.bat`** (Windows) ou
+   **`iniciar.command`** (Mac). Na primeira vez ele instala o que precisa.
+3. A janela mostra o **código da equipe** e os endereços. O painel abre sozinho em
+   `https://localhost:8443/painel.html`. O navegador avisa que o certificado não é
+   confiável: é normal num servidor local, clique em *Avançado → Continuar*.
+4. Em **Criar acesso**, use o código da equipe. Depois gere um lote de adesivos.
+5. **No celular** (mesmo Wi-Fi do computador): escaneie um adesivo impresso. O QR
+   aponta para o endereço do computador na rede (ex.: `https://192.168.0.10:8443/`).
+   Aceite o aviso do certificado e jogue.
+
+Se o celular não abrir, libere a porta 8443 no firewall do Windows quando ele perguntar
+(marque "Redes privadas").
+
 ## Como ligar a nuvem (uma vez, uns 10 minutos)
 
 1. **Criar o projeto:** entre em https://supabase.com, crie uma conta e um projeto
