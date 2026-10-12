@@ -197,7 +197,7 @@ const ING = {
 };
 const BURNT = {queimado:{label:'Queimado', fly:9, s:.75}, carvao:{label:'Queimado', fly:8, s:.8}};
 const LEVELS = [
-  {name:'Margherita', need:{tomate:3, mussarela:3}, move:0, wind:0, burnt:0, r:1.7},
+  {name:'Zumbis da Pizza', zombie:true, need:{tomate:3, mussarela:3}, move:0, wind:0, burnt:0, r:1.7},
   {name:'Mussarela', need:{mussarela:5, tomate:2}, move:0, wind:0, burnt:.12, r:1.6},
   {name:'Presunto', need:{presunto:4, mussarela:3}, move:.5, wind:0, burnt:.12, r:1.6},
   {name:'Cebola', need:{cebola:4, mussarela:3, tomate:1}, move:.7, wind:0, burnt:.15, r:1.55},
@@ -301,7 +301,7 @@ function lvlNote(){
   const u = unlocked(), el = $('lvlNote'); if(!el) return;
   el.textContent = u >= 10 ? 'Todas as 10 fases liberadas.' : SB ? 'Fases liberadas: ' + u + ' de 10. Cada pizza com adesivo libera a próxima.' : 'Vença uma fase para liberar a próxima.';
 }
-function renderLevels(){ lvlNote();
+function renderLevels(){ lvlNote(); $('go').textContent = LEVELS[selLevel - 1].zombie ? 'Jogar fase 1: Zumbis da Pizza' : 'Abrir câmera';
   $('levels').innerHTML = LEVELS.map((L, i) => {
     const n = i + 1, open = n <= unlocked(), st = P.stars[n] || 0;
     return '<button type="button" class="lvl' + (open ? '' : ' locked') + (n === selLevel ? ' sel' : '') + '" data-n="' + n + '" aria-label="Nível ' + n + ', ' + L.name + (open ? '' : ', trancado') + '"><span class="n">' + n + '</span><span class="st">' + (st ? '★'.repeat(st) : '') + '</span></button>';
@@ -385,6 +385,7 @@ function setupScene(){
 
 /* ================= Início ================= */
 $('go').addEventListener('click', async () => {
+  if(LEVELS[selLevel - 1].zombie){ location.href = 'zumbi.html'; return; }
   $('go').disabled = true; $('go').textContent = 'Abrindo a câmera…'; $('startErr').hidden = true;
   try{
     await modelsReady;

@@ -1,0 +1,1010 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>Zumbis da Pizza AR</title>
+<meta name="theme-color" content="#14110d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shrikhand&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* Câmera em tela cheia; placar e vidas no topo; arma, tamanho e botão de bomba embaixo; mira no centro */
+:root{
+  --oven:#14110d; --flour:#f7efe3; --ash:#c9b8a8; --crust:#f1c27a; --ember:#e8592b; --slime:#8fd14f; --danger:#ef5a4c;
+  --panel:rgba(20,17,13,.84); --line:rgba(241,194,122,.25); --slot:rgba(247,239,227,.1);
+  --display:'Shrikhand', Georgia, serif; --body:'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;background:var(--oven);color:var(--flour);font-family:var(--body);overflow:hidden;-webkit-font-smoothing:antialiased;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-offset:2px}
+#ar{position:fixed;inset:0;overflow:hidden}
+#ar.sky{background:linear-gradient(#7cc4ef 0%,#bfe6f7 55%,#f3e2c3 100%)}
+#touch{position:fixed;inset:0;z-index:2;touch-action:none}
+.top{position:fixed;left:0;right:0;top:0;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:3;pointer-events:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(6px)}
+.score{padding:8px 12px;min-width:150px}
+.score .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);font-weight:800;display:flex;justify-content:space-between;gap:8px}
+.score .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.bar{height:7px;border-radius:99px;background:var(--slot);overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--slime),var(--crust));border-radius:99px;transition:width .25s}
+.side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.hearts{display:flex;gap:2px}
+.hearts svg{width:22px;height:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
+.hearts .on path{fill:var(--ember)}
+.hearts .off path{fill:rgba(20,17,13,.6);stroke:var(--line)}
+.tools{display:flex;gap:6px;pointer-events:auto}
+.ghost{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 11px;font-size:13px;font-weight:700;min-height:34px}
+.bottom{position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:flex-end;gap:10px;z-index:3;pointer-events:none}
+.weapon{padding:8px 12px;display:flex;align-items:center;gap:10px;max-width:62vw}
+.weapon .ic{width:34px;height:34px;flex:none}
+.weapon b{display:block;font-size:15px;line-height:1.15}
+.weapon small{display:block;font-size:12px;color:var(--ash);line-height:1.3}
+.fire{pointer-events:auto;width:84px;height:84px;border-radius:50%;border:3px solid rgba(255,255,255,.85);background:radial-gradient(circle at 35% 30%,#ff8a5c,var(--ember) 55%,#a8321a);box-shadow:0 6px 18px rgba(0,0,0,.5);display:grid;place-items:center;font-weight:800;font-size:14px;letter-spacing:.04em;text-transform:uppercase;touch-action:none}
+.fire:active{transform:scale(.94)}
+.fire svg{width:34px;height:34px;display:block;margin:0 auto -2px}
+#cross{position:fixed;left:50%;top:50%;width:64px;height:64px;transform:translate(-50%,-50%);z-index:3;pointer-events:none;filter:drop-shadow(0 0 3px rgba(0,0,0,.8))}
+#cross svg{width:100%;height:100%;display:block}
+#cross.cool{opacity:.45}
+.scan{position:fixed;inset:0;z-index:4;display:grid;place-items:center;pointer-events:none}
+.scan .box{width:min(64vw,300px);aspect-ratio:1;border-radius:22px;position:relative;animation:pulse 1.8s ease-in-out infinite}
+.scan .box i{position:absolute;width:40px;height:40px;border-color:var(--crust);border-style:solid;border-width:0}
+.scan .box i:nth-child(1){top:0;left:0;border-top-width:4px;border-left-width:4px;border-top-left-radius:22px}
+.scan .box i:nth-child(2){top:0;right:0;border-top-width:4px;border-right-width:4px;border-top-right-radius:22px}
+.scan .box i:nth-child(3){bottom:0;left:0;border-bottom-width:4px;border-left-width:4px;border-bottom-left-radius:22px}
+.scan .box i:nth-child(4){bottom:0;right:0;border-bottom-width:4px;border-right-width:4px;border-bottom-right-radius:22px}
+.scan p{position:absolute;left:0;right:0;bottom:22%;text-align:center;margin:0;padding-inline:24px;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.9)}
+@keyframes pulse{50%{transform:scale(.94)}}
+.banner{position:fixed;left:50%;top:24%;transform:translate(-50%,-50%);z-index:4;pointer-events:none;text-align:center;width:min(92vw,520px)}
+.banner b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(26px,7vw,40px);line-height:1.1;color:var(--crust);text-shadow:0 3px 0 #5a2c18,0 6px 16px rgba(0,0,0,.7)}
+.banner span{display:block;margin-top:6px;font-weight:800;font-size:15px;text-shadow:0 2px 8px rgba(0,0,0,.9)}
+.banner.show{animation:bannerIn 2.4s ease forwards}
+.banner.slime b{color:var(--slime);text-shadow:0 3px 0 #2c4a17,0 6px 16px rgba(0,0,0,.7)}
+@keyframes bannerIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}20%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
+.pop{position:fixed;transform:translate(-50%,-50%);font-weight:800;font-size:20px;color:var(--crust);text-shadow:0 2px 6px rgba(0,0,0,.85);pointer-events:none;animation:rise 1s ease-out forwards;z-index:4;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pop.big{font-family:var(--display);font-weight:400;font-size:26px;color:#ffe08a}
+.pop.bad{color:#ffb4aa}
+@keyframes rise{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-56px}}
+body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
+@keyframes hitfl{to{opacity:0}}
+.skip{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:4}
+.sizer{position:fixed;left:14px;right:14px;bottom:calc(120px + env(safe-area-inset-bottom,0px));z-index:5;margin:0 auto;max-width:420px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.sizer label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ash)}
+.sizer label span{display:flex;justify-content:space-between}
+.sizer label output{color:var(--flour);font-variant-numeric:tabular-nums}
+.sizer input[type=range]{width:100%;accent-color:var(--ember);height:28px}
+.screen{position:fixed;inset:0;z-index:6;display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto;background:radial-gradient(120% 80% at 50% 110%,#2f4a1c 0%,#1d2414 45%,var(--oven) 100%)}
+.screen.over{background:rgba(12,10,8,.62)}
+.panel{width:min(440px,100%);background:rgba(28,23,17,.95);border:1px solid var(--line);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.eyebrow{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slime);font-weight:800}
+h1{margin:-6px 0 0;font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;color:var(--crust)}
+h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(--crust)}
+.lede{margin:0;line-height:1.5;font-size:15px}
+.note{margin:0;font-size:12.5px;line-height:1.45;color:var(--ash)}
+.steps{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.steps li{display:flex;gap:10px;align-items:flex-start;font-size:14px;line-height:1.4}
+.steps b{flex:none;width:24px;height:24px;border-radius:50%;background:var(--ember);display:grid;place-items:center;font-size:13px}
+.btn{border:none;border-radius:14px;padding:15px 16px;font-weight:800;font-size:16px;background:var(--slot)}
+.btn.primary{background:var(--ember);color:#fff8f0}
+.btn:disabled{opacity:.6}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row .btn{flex:1 1 140px}
+.big{font-family:var(--display);font-size:46px;line-height:1;color:var(--crust);font-variant-numeric:tabular-nums}
+.lines{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.lines li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.lines li span:last-child{font-weight:700;font-variant-numeric:tabular-nums}
+.info{margin:0;font-size:14px;line-height:1.45}
+.info.good{color:#cfeec8}
+.info.warn{color:#ffd8a8}
+.err{color:#ffb4aa;font-size:14px;margin:0}
+.load{height:8px;border-radius:99px;background:var(--slot);overflow:hidden}
+.load i{display:block;height:100%;width:0;background:var(--slime);transition:width .2s}
+.stars{display:flex;gap:8px}
+.stars svg{width:44px;height:44px}
+.stars .on path{fill:var(--crust)}
+.stars .off path{fill:var(--slot);stroke:var(--line)}
+@media (prefers-reduced-motion:reduce){.scan .box{animation:none}.pop{animation-duration:.01s}.banner.show{animation-duration:2.4s}}
+</style>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/",
+  "mindar-image-three":"https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+}}
+</script>
+</head>
+<body>
+<div id="ar"></div>
+<div id="touch" hidden></div>
+<div id="cross" hidden><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="20" fill="none" stroke="#fff" stroke-width="3.5"/><circle cx="32" cy="32" r="3.5" fill="#ff5a3c"/><path d="M32 4v12M32 48v12M4 32h12M48 32h12" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+
+<div class="top" id="hud" hidden>
+  <div class="card score"><div class="k"><span>Pontos</span><span id="hGoal">meta 5.000</span></div><div class="v" id="hScore">0</div><div class="bar"><i id="hBar"></i></div></div>
+  <div class="side">
+    <div class="hearts" id="hLives" aria-label="Vidas"></div>
+    <div class="tools">
+      <button class="ghost" id="bSound" type="button" aria-label="Som">Som</button>
+      <button class="ghost" id="bSize" type="button">Tamanho</button>
+      <button class="ghost" id="bQuit" type="button">Sair</button>
+    </div>
+  </div>
+</div>
+<div class="bottom" id="hudB" hidden>
+  <div class="card weapon"><svg class="ic" id="wIcon" viewBox="0 0 40 40" aria-hidden="true"></svg><div><b id="wName">Bomba</b><small id="wNext"></small></div></div>
+  <button class="fire" id="fire" type="button" aria-label="Jogar bomba"><span><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="18" cy="23" r="12" fill="#1d1b20"/><path d="M26 13c3-5 6-6 9-5" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/><circle cx="35" cy="7" r="3" fill="#ffd36b"/></svg>Bomba</span></button>
+</div>
+<div class="card sizer" id="sizer" hidden>
+  <label for="sGame"><span>Jogo todo <output id="oGame">100%</output></span><input type="range" id="sGame" min="30" max="300" step="5" value="100"></label>
+  <label for="sHouse"><span>Casa <output id="oHouse">100%</output></span><input type="range" id="sHouse" min="70" max="150" step="5" value="100"></label>
+  <p class="note">Dica: na câmera, use dois dedos (pinça) para mudar o tamanho do jogo todo.</p>
+  <button class="btn primary" id="sDone" type="button">Pronto</button>
+</div>
+<button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
+<div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa</p></div>
+<div class="banner" id="banner" aria-live="polite"><b id="bTitle"></b><span id="bSub"></span></div>
+
+<section class="screen" id="start">
+  <div class="panel">
+    <p class="eyebrow" id="pzEyebrow">Monte a Pizza · Fase 1</p>
+    <h1>Zumbis da Pizza</h1>
+    <p class="lede">O motoboy entregou a pizza e os zumbis sentiram o cheiro. Defenda a casa!</p>
+    <ul class="steps">
+      <li><b>1</b><span>Aponte a câmera para o adesivo: a casa aparece em cima da caixa.</span></li>
+      <li><b>2</b><span>Mire com o centro da tela e toque para jogar bombas nos zumbis.</span></li>
+      <li><b>3</b><span>Zumbi comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.</span></li>
+      <li><b>4</b><span>Cada zumbi que entra na casa tira 1 das 5 vidas. Matando vários, você ganha armas mais fortes.</span></li>
+    </ul>
+    <div class="load" id="loadBar"><i id="loadFill"></i></div>
+    <button class="btn primary" id="goAR" type="button" disabled>Carregando…</button>
+    <button class="btn" id="go3D" type="button" disabled>Jogar sem câmera</button>
+    <p class="err" id="startErr" hidden></p>
+    <p class="note" id="bestNote"></p>
+    <a class="note" href="index.html" id="backLink">← Voltar às fases</a>
+  </div>
+</section>
+
+<section class="screen over" id="end" hidden>
+  <div class="panel">
+    <p class="eyebrow">Fase 1 · Zumbis da Pizza</p>
+    <h2 id="eTitle">Casa salva!</h2>
+    <div class="stars" id="eStars"></div>
+    <div class="big" id="eScore">0</div>
+    <ul class="lines" id="eLines"></ul>
+    <p class="info" id="eInfo" hidden></p>
+    <div class="row">
+      <button class="btn" id="eMenu" type="button">Fases</button>
+      <button class="btn primary" id="eAgain" type="button">Jogar de novo</button>
+    </div>
+  </div>
+</section>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
+import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
+
+THREE.ColorManagement.enabled = true;
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random()*(b - a);
+const pick = a => a[Math.floor(Math.random()*a.length)];
+const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = n => n.toLocaleString('pt-BR');
+
+/* ================= Regras ================= */
+const GOAL = 5000, LIVES = 5;
+const WEAPONS = [
+  {name:'Bomba', kills:0, R:1.15, dmg:1, n:1, cd:.42, color:0x26242b, size:.17},
+  {name:'Bomba de Pimenta', kills:10, R:1.5, dmg:1, n:1, cd:.4, color:0xd8352a, size:.19},
+  {name:'Bomba Tripla', kills:25, R:1.25, dmg:1, n:3, spread:1.1, cd:.5, color:0x2f6fd6, size:.15},
+  {name:'Bomba Calabresa', kills:45, R:2.1, dmg:2, n:1, cd:.55, color:0xa4472b, size:.27},
+  {name:'Chuva de Bombas', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
+];
+const TYPES = {
+  zumbi:{label:'Zumbi', models:['Rogue','Rogue_Hooded','Mage'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.9, from:0, w:5},
+  escalador:{label:'Zumbis escaladores', models:['Rogue_Hooded','Rogue'], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
+  esqueleto:{label:'Esqueletos corredores', models:['anims'], hp:1, pts:50, speed:1.15, h:1, walk:'Running_A', ts:.85, from:700, w:3, death:'Death_C_Skeletons'},
+  guerreiro:{label:'Esqueletos guerreiros', models:['Skeleton_Warrior'], hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', from:1500, w:2.2, death:'Death_C_Skeletons'},
+  ninja:{label:'Esqueletos ninja (sobem no telhado)', models:['Skeleton_Rogue'], hp:2, pts:100, strong:true, speed:1, h:1, walk:'Running_A', climb:true, from:2300, w:1.6, death:'Death_C_Skeletons'},
+  mago:{label:'Esqueletos magos (se teletransportam)', models:['Skeleton_Mage'], hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_D_Skeletons', blink:true, from:3000, w:1.5, death:'Death_C_Skeletons'},
+  gigante:{label:'Zumbis gigantes', models:['Knight'], zombie:true, hp:5, pts:100, strong:true, speed:.42, h:1.75, walk:'Walking_D_Skeletons', ts:.7, from:3800, w:1, breakT:1.5}
+};
+
+/* ===== Cartão fidelidade ===== */
+const CFG = window.PIZZA_CONFIG || {};
+const SB = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
+const LS = { get:k => { try{ return localStorage.getItem('mp-' + k); }catch(e){ return null; } }, set:(k, v) => { try{ localStorage.setItem('mp-' + k, v); }catch(e){} } };
+const PKEY = 'monte-a-pizza-ar-v1';
+function loadP(){ let P = {unlocked:1, stars:{}, best:{}}; try{ P = Object.assign(P, JSON.parse(localStorage.getItem(PKEY)) || {}); }catch(e){} return P; }
+function saveP(P){ try{ localStorage.setItem(PKEY, JSON.stringify(P)); }catch(e){} }
+{ const b = loadP().best[1]; if(b) $('bestNote').textContent = 'Seu recorde: ' + fmt(b) + ' pontos.'; }
+
+/* ================= Som (sintetizado) ================= */
+let AC = null, muted = LS.get('zmute') === '1';
+function audio(){ if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state === 'suspended') AC.resume(); }
+function env(g, t, a, peak, d){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function tone(type, f1, f2, dur, vol, delay = 0){
+  if(!AC || muted) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(f1, t); if(f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  env(g, t, .01, vol, dur); o.connect(g).connect(AC.destination); o.start(t); o.stop(t + dur + .05);
+}
+let noiseBuf = null;
+function boom(big){
+  if(!AC || muted) return; const t = AC.currentTime;
+  if(!noiseBuf){ noiseBuf = AC.createBuffer(1, AC.sampleRate*.8, AC.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i] = (Math.random()*2 - 1)*Math.pow(1 - i/d.length, 2); }
+  const s = AC.createBufferSource(); s.buffer = noiseBuf; const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(big ? 900 : 1400, t); f.frequency.exponentialRampToValueAtTime(120, t + .6);
+  const g = AC.createGain(); env(g, t, .005, big ? .9 : .6, .6); s.connect(f).connect(g).connect(AC.destination); s.start(t);
+  tone('sine', 110, 38, .45, big ? .9 : .6);
+}
+const groan = () => { tone('sawtooth', rand(95, 130), rand(60, 80), .7, .07); };
+const ding = () => { tone('sine', 880, 0, .5, .25); tone('sine', 698, 0, .7, .25, .32); };
+const ouch = () => { tone('square', 330, 110, .45, .12); };
+const levelUp = () => { [523, 659, 784, 1046].forEach((f, i) => tone('triangle', f, 0, .18, .18, i*.09)); };
+let engine = null;
+function engineOn(on){
+  if(!AC || muted){ return; }
+  if(on && !engine){ const o = AC.createOscillator(), l = AC.createOscillator(), lg = AC.createGain(), g = AC.createGain(), f = AC.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.value = 62; l.frequency.value = 18; lg.gain.value = 9; l.connect(lg).connect(o.frequency); f.type = 'lowpass'; f.frequency.value = 600;
+    g.gain.value = .06; o.connect(f).connect(g).connect(AC.destination); o.start(); l.start(); engine = {o, l, g}; }
+  if(!on && engine){ const e = engine; engine = null; e.g.gain.setTargetAtTime(0, AC.currentTime, .1); setTimeout(() => { try{ e.o.stop(); e.l.stop(); }catch(x){} }, 500); }
+}
+function renderSound(){ $('bSound').textContent = muted ? 'Som: não' : 'Som'; }
+$('bSound').addEventListener('click', () => { muted = !muted; LS.set('zmute', muted ? '1' : '0'); if(muted) engineOn(false); renderSound(); });
+renderSound();
+
+/* ================= Materiais cartoon ================= */
+const GRAD = (() => { const d = new Uint8Array([90, 170, 255]); const t = new THREE.DataTexture(d, 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const MATS = {};
+function mat(hex, extra){ const k = hex + (extra ? JSON.stringify(extra) : ''); return MATS[k] || (MATS[k] = new THREE.MeshToonMaterial(Object.assign({color:hex, gradientMap:GRAD}, extra || {}))); }
+const toonCache = new Map();
+function toonOf(m, zombie){
+  const k = m.uuid + (zombie ? 'z' : '');
+  if(toonCache.has(k)) return toonCache.get(k);
+  const t = new THREE.MeshToonMaterial({color:m.color, map:m.map, gradientMap:GRAD, transparent:m.transparent, opacity:m.opacity, side:m.side});
+  if(zombie){
+    // pele amarela vira verde-zumbi; o resto fica sujo e apagado
+    t.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      vec3 zc = diffuseColor.rgb;
+      float skin = step(.45, zc.r) * step(zc.b, .5*zc.r) * step(.5*zc.r, zc.g) * step(zc.g, .97*zc.r);
+      diffuseColor.rgb = mix(zc*vec3(.62,.7,.58), vec3(.36,.62,.26)*(.75 + .5*zc.r), skin);`); };
+    t.customProgramCacheKey = () => 'zombie';
+  }
+  toonCache.set(k, t); return t;
+}
+
+/* ================= Carregamento ================= */
+const manager = new THREE.LoadingManager();
+manager.onProgress = (u, a, b) => { $('loadFill').style.width = Math.round(a/b*100) + '%'; };
+const loader = new GLTFLoader(manager);
+const FILES = ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'Skeleton_Warrior', 'Skeleton_Mage', 'Skeleton_Rogue', 'props'];
+const GL = {};
+const KEEP = /Body|Arm|Leg|Head|Hat|Helmet|Cape|Cloak|Eyes|Jaw|Skull|Hood/;
+const TPL = {};
+const CLIPS = {};
+const PROPS = ['pumpkin', 'pumpkinS', 'grave', 'gravestone', 'deadTree', 'deadTreeM', 'lantern', 'postLantern', 'fence', 'pine', 'pineY', 'marker'];
+function template(key, zombie){
+  const k = key + (zombie ? '_z' : '');
+  if(TPL[k]) return TPL[k];
+  const s = skClone(GL[key].scene);
+  s.traverse(o => { if(o.isMesh){
+    if(!KEEP.test(o.name) || (zombie && /Helmet/.test(o.name))) o.visible = false;
+    o.material = toonOf(o.material, zombie); o.frustumCulled = false;
+  } });
+  const b = new THREE.Box3(); s.traverse(o => { if(o.isMesh && o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
+  return (TPL[k] = {scene:s, h:Math.max(.5, b.max.y - b.min.y)});
+}
+const ready = Promise.all(FILES.map(f => new Promise((res, rej) => loader.load('zumbi/' + f + '.glb', g => { GL[f] = g; res(); }, undefined, rej))))
+  .then(() => { GL.anims.animations.forEach(c => CLIPS[c.name] = c); });
+ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar com a câmera (AR)'; $('go3D').disabled = false; $('loadBar').hidden = true; })
+  .catch(e => { console.error(e); $('startErr').textContent = 'Não foi possível carregar o jogo. Verifique a internet e recarregue a página.'; $('startErr').hidden = false; });
+
+/* ================= Personagens ================= */
+const blobGeo = new THREE.CircleGeometry(.36, 20).rotateX(-Math.PI/2);
+const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.28, depthWrite:false});
+blobMat.userData.outlineParameters = {visible:false};
+function actor(key, h, zombie){
+  const T = template(key, zombie), m = skClone(T.scene);
+  m.scale.setScalar(h/T.h);
+  const g = new THREE.Group(); g.add(m);
+  const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .02; sh.scale.setScalar(h); g.add(sh);
+  const mixer = new THREE.AnimationMixer(m), acts = {};
+  const A = {g, m, mixer, shadow:sh, cur:null, name:'',
+    play(n, o = {}){
+      if(A.name === n && !o.restart) return A.cur;
+      const a = acts[n] || (acts[n] = mixer.clipAction(CLIPS[n]));
+      a.reset(); a.setLoop(o.once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity); a.clampWhenFinished = !!o.once;
+      a.timeScale = o.ts || 1; a.setEffectiveWeight(1); a.play();
+      if(A.cur && A.cur !== a) A.cur.crossFadeTo(a, o.fade == null ? .2 : o.fade, false);
+      A.cur = a; A.name = n; return a;
+    }};
+  return A;
+}
+const yawTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
+function turn(obj, target, dt, speed = 10){
+  let d = target - obj.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
+  obj.rotation.y += d*Math.min(1, dt*speed);
+}
+
+/* ================= Cena ================= */
+let renderer, scene, camera, effect, root, world, house, HS = 1, GS = 1, mindar = null, anchor = null;
+let AR = false, tracking = false;
+const BASE_AR = .085;
+const HW = 3.2, HD = 2.6, d2 = HD/2, WH = 1.7, RH = 1.15, OV = .34, TAN = RH/d2, ANG = Math.atan(RH/d2);
+const roofY = z => WH + RH - Math.abs(z)*TAN + .08;
+const CHIM = V(.85, 0, -.45);
+const RAYS = [];
+let ENTRIES = [];
+let door, chimneyTop;
+
+function canvasTex(w, h, draw, rep){
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+  if(rep){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); }
+  return t;
+}
+function rng(seed){ let s = seed; return () => (s = (s*16807) % 2147483647) / 2147483647; }
+function box(w, h, d, color, r = .04, extra){ return new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, Math.min(r, w/2.1, h/2.1, d/2.1)), mat(color, extra)); }
+function at(m, x, y, z, parent){ m.position.set(x, y, z); (parent || world).add(m); return m; }
+
+function buildGround(){
+  const grass = canvasTex(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#7cc35b'; g.fillRect(0, 0, w, h); const r = rng(5);
+    for(let i=0;i<900;i++){ g.fillStyle = r() < .5 ? 'rgba(60,130,50,.35)' : 'rgba(170,220,110,.35)'; const x = r()*w, y = r()*h; g.beginPath(); g.ellipse(x, y, 3 + r()*9, 2 + r()*5, r()*3, 0, 6.3); g.fill(); }
+    // caminho de pedras até a rua
+    g.fillStyle = '#d9cbb4'; for(let i=0;i<7;i++){ g.beginPath(); g.ellipse(512 + (i%2 ? 10 : -10), 512 + 95 + i*42, 30, 16, 0, 0, 6.3); g.fill(); }
+    // terra do cemitério
+    g.fillStyle = 'rgba(120,92,60,.55)'; g.beginPath(); g.ellipse(512, 512 - 300, 330, 120, 0, 0, 6.3); g.fill();
+  });
+  const top = new THREE.Mesh(new THREE.CircleGeometry(9.5, 72).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:grass, gradientMap:GRAD}));
+  top.material.userData.outlineParameters = {visible:false};
+  world.add(top); RAYS.push(top); top.userData.ground = true;
+  const side = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.1, .6, 72, 1, true), mat(0x8a5a36, {side:THREE.DoubleSide}));
+  side.position.y = -.3; world.add(side);
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(9.1, 72).rotateX(Math.PI/2), mat(0x6b4428)); bottom.position.y = -.6; world.add(bottom);
+  // rua
+  const road = canvasTex(1024, 128, (g, w, h) => { g.fillStyle = '#4a4d55'; g.fillRect(0, 0, w, h); g.fillStyle = '#f2d36b'; for(let x=20;x<w;x+=90) g.fillRect(x, h/2 - 5, 50, 10); g.fillStyle = 'rgba(255,255,255,.08)'; for(let i=0;i<300;i++) g.fillRect(Math.random()*w, Math.random()*h, 3, 3); });
+  const rd = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 1.5).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:road, gradientMap:GRAD}));
+  rd.material.userData.outlineParameters = {visible:false};
+  rd.position.set(0, .015, 6.1); world.add(rd);
+  const curb = box(14.6, .08, .16, 0xd9d2c5, .03); at(curb, 0, .04, 5.28);
+}
+
+function windowAt(x, y, z, ry){
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry;
+  g.add(box(.66, .66, .08, 0xfff6e8, .03));
+  const glass = box(.52, .52, .1, 0x8fd3ff, .02, {emissive:0x1d4a66}); g.add(glass);
+  const v = box(.05, .52, .12, 0xfff6e8, .01); g.add(v); const hb = box(.52, .05, .12, 0xfff6e8, .01); g.add(hb);
+  [-.45, .45].forEach(sx => { const s = box(.2, .64, .05, 0x3f8fd0, .02); s.position.set(sx, 0, .02); g.add(s); });
+  const fb = box(.66, .13, .16, 0x9a5b34, .02); fb.position.set(0, -.4, .06); g.add(fb);
+  [[-.2, 0xff7aa8], [0, 0xffd34d], [.2, 0xff7aa8]].forEach(([fx, c]) => { const f = new THREE.Mesh(new THREE.IcosahedronGeometry(.075, 0), mat(c)); f.position.set(fx, -.3, .08); g.add(f); });
+  house.add(g); return g;
+}
+
+function buildHouse(){
+  house = new THREE.Group(); world.add(house);
+  const H = house;
+  const found = box(HW + .3, .22, HD + .3, 0xa89f94, .05); found.position.y = .11; H.add(found);
+  const walls = box(HW, WH - .2, HD, 0xf4d58d, .06); walls.position.y = .2 + (WH - .2)/2; H.add(walls);
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => { const c = box(.14, WH - .2, .14, 0xfff6e8, .03); c.position.set(sx*HW/2, .2 + (WH - .2)/2, sz*HD/2); H.add(c); });
+  const belt = box(HW + .1, .1, HD + .1, 0xfff6e8, .03); belt.position.y = WH - .04; H.add(belt);
+  // oitão (triângulo das laterais)
+  const sh = new THREE.Shape(); sh.moveTo(-d2, 0); sh.lineTo(d2, 0); sh.lineTo(0, RH); sh.lineTo(-d2, 0);
+  const gg = new THREE.ExtrudeGeometry(sh, {depth:HW - .04, bevelEnabled:false}); gg.rotateY(Math.PI/2); gg.translate(-(HW - .04)/2, WH, 0);
+  const gable = new THREE.Mesh(gg, mat(0xf4d58d)); H.add(gable);
+  // telhado
+  const sl = Math.sqrt(d2*d2 + RH*RH) + OV, roofParts = [];
+  [1, -1].forEach(s => {
+    const ez = s*(d2 + OV*Math.cos(ANG)), ey = WH + RH - (d2 + OV*Math.cos(ANG))*TAN;
+    const slab = box(HW + .55, .14, sl, 0xd9573b, .05);
+    slab.rotation.x = s*ANG; slab.position.set(0, (WH + RH + ey)/2 + .07*Math.cos(ANG), ez/2 + s*.07*Math.sin(ANG));
+    H.add(slab); roofParts.push(slab);
+    for(let i=1;i<5;i++){ // fileiras de telha
+      const f = i/5, row = box(HW + .58, .05, .07, 0xb8432c, .02);
+      row.rotation.x = s*ANG; row.position.set(0, WH + RH + (ey - WH - RH)*f + .16*Math.cos(ANG), ez*f + s*.16*Math.sin(ANG)); H.add(row);
+    }
+  });
+  const ridge = new THREE.Mesh(new THREE.CylinderGeometry(.12, .12, HW + .6, 12).rotateZ(Math.PI/2), mat(0xa63a26)); ridge.position.y = WH + RH + .12; H.add(ridge);
+  const ch = box(.42, 1.0, .42, 0xb5523b, .04); ch.position.set(CHIM.x, roofY(CHIM.z) + .25, CHIM.z); H.add(ch);
+  const cap = box(.52, .1, .52, 0x6d6460, .03); cap.position.set(CHIM.x, roofY(CHIM.z) + .78, CHIM.z); H.add(cap);
+  chimneyTop = V(CHIM.x, roofY(CHIM.z) + .85, CHIM.z);
+  // porta, varanda e toldo
+  const frame = box(.82, 1.18, .08, 0xfff6e8, .03); frame.position.set(0, .2 + .59, d2 + .02); H.add(frame);
+  door = new THREE.Group(); door.position.set(-.31, .2, d2 + .06); H.add(door);
+  const dm = box(.62, 1.06, .07, 0x8a4b2a, .03); dm.position.set(.31, .53, 0); door.add(dm);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(.04, 10, 8), mat(0xffd36b)); knob.position.set(.54, .52, .06); door.add(knob);
+  [.3, .75].forEach(y => { const p = box(.46, .3, .02, 0x9f5a35, .02); p.position.set(.31, y, .045); door.add(p); });
+  const step = box(1.1, .12, .45, 0xc39a6b, .03); step.position.set(0, .06, d2 + .3); H.add(step);
+  const awn = box(1.1, .07, .5, 0xd9573b, .03); awn.rotation.x = .25; awn.position.set(0, 1.5, d2 + .26); H.add(awn);
+  const mat1 = box(.6, .02, .3, 0x5c8a3a, .01); mat1.position.set(0, .13, d2 + .32); H.add(mat1);
+  // janelas e pontos de entrada dos zumbis
+  const wins = {
+    fl:windowAt(-1.0, 1.0, d2 + .05, 0), fr:windowAt(1.0, 1.0, d2 + .05, 0),
+    bl:windowAt(-.75, 1.0, -d2 - .05, Math.PI), br:windowAt(.75, 1.0, -d2 - .05, Math.PI),
+    l:windowAt(-HW/2 - .05, 1.0, .1, -Math.PI/2), r:windowAt(HW/2 + .05, 1.0, -.1, Math.PI/2)
+  };
+  ENTRIES = [
+    {p:V(0, 0, d2 + .62), obj:door, door:true},
+    {p:V(-1.0, 0, d2 + .45), obj:wins.fl}, {p:V(1.0, 0, d2 + .45), obj:wins.fr},
+    {p:V(-.75, 0, -d2 - .45), obj:wins.bl}, {p:V(.75, 0, -d2 - .45), obj:wins.br},
+    {p:V(-HW/2 - .45, 0, .1), obj:wins.l}, {p:V(HW/2 + .45, 0, -.1), obj:wins.r}
+  ];
+  ENTRIES.forEach(e => { e.ang = Math.atan2(e.p.z, e.p.x); e.rz = e.obj.rotation.z; e.ry = e.obj.rotation.y; });
+  H.traverse(o => { if(o.isMesh) RAYS.push(o); });
+}
+
+function propAt(name, x, z, s, ry = 0, y = 0){
+  const o = GL.props.scenes[PROPS.indexOf(name)].clone(true);
+  o.traverse(c => { if(c.isMesh) c.material = toonOf(c.material, false); });
+  o.scale.setScalar(s); o.rotation.y = ry; o.position.set(x, y, z); world.add(o); return o;
+}
+const GRAVES = [];
+function buildProps(){
+  [[-3, -5.2, .42, .2], [-4.7, -4.1, .4, .5], [-1.6, -6.6, .4, -.1], [1.4, -6.3, .42, .15], [3.2, -5.1, .4, -.3], [4.8, -3.9, .4, -.6]].forEach(([x, z, s, r], i) => { propAt(i%2 ? 'gravestone' : 'grave', x, z, s, r); GRAVES.push(V(x, 0, z + .55)); });
+  [[-5.8, -6.2], [0, -7.8], [5.9, -5.9]].forEach(([x, z]) => propAt('marker', x, z, .4, rand(-.4, .4)));
+  propAt('deadTree', -6.9, -2.6, .42, .4); propAt('deadTreeM', 6.9, -1.8, .45, 2); propAt('deadTree', 2.6, -7.9, .38, 1);
+  propAt('pine', -7.6, 2.4, .32, .3); propAt('pineY', 7.7, 2.9, .38, 1.2); propAt('pine', -3.3, -8.3, .27, 2);
+  propAt('fence', -3.4, -8.2, .33, 0); propAt('fence', 4.2, -7.9, .33, -.2);
+  propAt('pumpkin', -.78, d2 + .5, .22, .4); propAt('pumpkinS', .74, d2 + .5, .26, -.3); propAt('pumpkin', -2.4, 2.6, .28, .9); propAt('pumpkinS', 2.6, 2.1, .3, 2);
+  propAt('postLantern', -1.0, 4.6, .5, Math.PI); propAt('postLantern', 1.0, 4.6, .5, 0);
+  propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
+}
+
+/* ===== Moto de entrega e caixa de pizza (feitas em código) ===== */
+const pizzaLabel = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#e9c48f'; g.fillRect(0, 0, w, h); g.fillStyle = '#d43a2a'; g.beginPath(); g.arc(128, 128, 92, 0, 6.3); g.fill(); g.fillStyle = '#fff'; g.font = 'bold 54px Figtree, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('PIZZA', 128, 132); });
+function pizzaBox(){
+  const g = new THREE.Group();
+  const b = box(.52, .08, .52, 0xe9c48f, .02); g.add(b);
+  const top = new THREE.Mesh(new THREE.PlaneGeometry(.48, .48).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:pizzaLabel, gradientMap:GRAD}));
+  top.material.userData.outlineParameters = {visible:false}; top.position.y = .042; g.add(top);
+  return g;
+}
+const deliveryTex = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#d43a2a'; g.fillRect(0, 0, w, h); g.fillStyle = '#fff'; g.fillRect(0, 36, w, 26); g.font = 'bold 64px Figtree, sans-serif'; g.textAlign = 'center'; g.fillText('PIZZA', 128, 170); });
+function scooter(){
+  const g = new THREE.Group(), red = 0xe0412b;
+  [-.52, .5].forEach(z => {
+    const w = new THREE.Mesh(new THREE.TorusGeometry(.19, .085, 10, 20).rotateY(Math.PI/2), mat(0x24222a)); w.position.set(0, .26, z); g.add(w);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .1, 12).rotateZ(Math.PI/2), mat(0xbfc5cc)); hub.position.set(0, .26, z); g.add(hub);
+  });
+  const deck = box(.34, .14, .9, 0x3b3940, .05); deck.position.set(0, .34, -.02); g.add(deck);
+  const body = box(.4, .36, .55, red, .14); body.position.set(0, .55, -.3); g.add(body);
+  const shield = box(.38, .66, .14, red, .06); shield.rotation.x = -.25; shield.position.set(0, .7, .42); g.add(shield);
+  const fender = box(.3, .1, .36, red, .05); fender.position.set(0, .5, .52); g.add(fender);
+  const col = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, .5, 8), mat(0x8e949b)); col.rotation.x = -.25; col.position.set(0, 1.0, .46); g.add(col);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(.03, .03, .62, 8).rotateZ(Math.PI/2), mat(0x24222a)); bar.position.set(0, 1.22, .52); g.add(bar);
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(.08, 12, 10), mat(0xffe9a0, {emissive:0x806a20})); lamp.position.set(0, 1.12, .62); g.add(lamp);
+  const seat = box(.34, .1, .5, 0x1f1d22, .05); seat.position.set(0, .78, -.28); g.add(seat);
+  const crate = box(.5, .46, .48, 0xd43a2a, .05); crate.position.set(0, 1.08, -.62); g.add(crate);
+  [-.26, .26].forEach(x => { const s = new THREE.Mesh(new THREE.PlaneGeometry(.44, .4), new THREE.MeshToonMaterial({map:deliveryTex, gradientMap:GRAD})); s.material.userData.outlineParameters = {visible:false}; s.rotation.y = x > 0 ? Math.PI/2 : -Math.PI/2; s.position.set(x, 1.08, -.62); g.add(s); });
+  return g;
+}
+
+/* ================= Efeitos ================= */
+const FX = [];
+const fxMat = (c, o = 1) => { const m = new THREE.MeshBasicMaterial({color:c, transparent:true, opacity:o, depthWrite:false}); m.userData.outlineParameters = {visible:false}; return m; };
+const sphereGeo = new THREE.IcosahedronGeometry(1, 1), puffGeo = new THREE.IcosahedronGeometry(1, 0), ringGeo = new THREE.RingGeometry(.8, 1, 40).rotateX(-Math.PI/2), cubeGeo = new THREE.BoxGeometry(1, 1, 1);
+function fx(mesh, life, upd){ world.add(mesh); const f = {mesh, life, t:0, upd}; upd(f, 0, 0); FX.push(f); }
+function explosionFX(p, R, color){
+  const core = new THREE.Mesh(sphereGeo, fxMat(0xffe27a)); core.position.copy(p);
+  fx(core, .35, (f, k) => { core.scale.setScalar(R*(.25 + .75*Math.min(1, k*3))); core.material.opacity = 1 - k; });
+  const ball = new THREE.Mesh(sphereGeo, fxMat(0xff7a2f, .9)); ball.position.copy(p);
+  fx(ball, .5, (f, k) => { ball.scale.setScalar(R*(.4 + .7*Math.min(1, k*2.4))); ball.material.opacity = .9*(1 - k); });
+  const ring = new THREE.Mesh(ringGeo, fxMat(0xfff1c2, .9)); ring.position.set(p.x, Math.max(.03, p.y - .1), p.z);
+  fx(ring, .45, (f, k) => { ring.scale.setScalar(R*(.3 + 1.1*k)); ring.material.opacity = .9*(1 - k); });
+  for(let i=0;i<9;i++){
+    const s = new THREE.Mesh(puffGeo, mat(i%3 ? 0x6f6a66 : 0x4a4644)); const dir = V(rand(-1, 1), rand(.3, 1.3), rand(-1, 1)).normalize();
+    s.position.copy(p); const sz = rand(.18, .32)*R;
+    fx(s, rand(.7, 1.1), (f, k, dt) => { s.position.addScaledVector(dir, dt*R*1.8*(1 - k)); s.position.y += dt*.6; s.scale.setScalar(sz*(k < .3 ? k/.3 : 1 - (k - .3)/.7*.9)); });
+  }
+  for(let i=0;i<7;i++){
+    const c = new THREE.Mesh(cubeGeo, mat(i%2 ? color : 0x3a2a20)); c.position.copy(p); const v = V(rand(-3, 3), rand(3, 6), rand(-3, 3)); c.scale.setScalar(rand(.06, .12));
+    fx(c, .9, (f, k, dt) => { v.y -= 14*dt; c.position.addScaledVector(v, dt); if(c.position.y < 0){ c.position.y = 0; v.set(v.x*.5, Math.abs(v.y)*.3, v.z*.5); } c.rotation.x += dt*9; c.rotation.z += dt*7; c.scale.multiplyScalar(k > .7 ? .9 : 1); });
+  }
+  shake = Math.max(shake, .14 + R*.05);
+}
+function puffs(p, color, n, size = .2, up = 1){
+  for(let i=0;i<n;i++){
+    const s = new THREE.Mesh(puffGeo, mat(color)); s.position.copy(p).add(V(rand(-.3, .3), rand(0, .2), rand(-.3, .3))); const dir = V(rand(-1, 1), up, rand(-1, 1)).normalize(); const sz = rand(.6, 1.2)*size;
+    fx(s, rand(.5, .9), (f, k, dt) => { s.position.addScaledVector(dir, dt*.9); s.scale.setScalar(sz*(1 - k)); });
+  }
+}
+const stinkTex = canvasTex(64, 128, (g) => { g.strokeStyle = 'rgba(190,230,90,.95)'; g.lineWidth = 7; g.lineCap = 'round'; g.beginPath(); for(let y=118;y>8;y-=4){ const x = 32 + Math.sin(y/12)*16; y === 118 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); });
+function stink(from){
+  const m = new THREE.SpriteMaterial({map:stinkTex, transparent:true, depthWrite:false}); const s = new THREE.Sprite(m); s.position.copy(from);
+  const dir = V(from.x, 0, from.z).normalize().multiplyScalar(rand(1.5, 2.6)); if(!isFinite(dir.x)) dir.set(rand(-1, 1), 0, rand(-1, 1));
+  fx(s, 2.6, (f, k, dt) => { s.position.addScaledVector(dir, dt); s.position.y += dt*.5; s.scale.set(.5*(1 + k), 1*(1 + k), 1); m.opacity = k < .2 ? k/.2 : 1 - (k - .2)/.8; m.rotation = Math.sin(f.t*4)*.3; });
+}
+function confetti(p){
+  const cols = [0xff5a3c, 0xffd34d, 0x8fd14f, 0x4fb3ff, 0xff7aa8];
+  for(let i=0;i<40;i++){ const c = new THREE.Mesh(cubeGeo, mat(pick(cols))); c.scale.set(.1, .02, .06); c.position.copy(p); const v = V(rand(-3, 3), rand(5, 9), rand(-3, 3));
+    fx(c, 2.2, (f, k, dt) => { v.y -= 9*dt; v.multiplyScalar(1 - dt*1.2); c.position.addScaledVector(v, dt); c.rotation.x += dt*8; c.rotation.y += dt*6; if(c.position.y < .02) c.position.y = .02; }); }
+}
+function updateFX(dt){
+  for(let i=FX.length-1;i>=0;i--){ const f = FX[i]; f.t += dt; const k = Math.min(1, f.t/f.life); f.upd(f, k, dt); if(k >= 1){ world.remove(f.mesh); FX.splice(i, 1); } }
+}
+let shake = 0;
+
+/* ===== HUD ===== */
+const HEART = '<path d="M12 20.5s-7.5-4.6-9.3-9.2C1.4 7.9 3.6 4.5 7 4.5c2 0 3.6 1.1 5 3 1.4-1.9 3-3 5-3 3.4 0 5.6 3.4 4.3 6.8-1.8 4.6-9.3 9.2-9.3 9.2z" stroke-width="1"/>';
+const STAR = '<path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.3-6.6L2.5 9.4l6.6-.8z" stroke-width="1"/>';
+const hex = c => '#' + c.toString(16).padStart(6, '0');
+function renderHUD(){
+  if(!G) return;
+  $('hScore').textContent = fmt(G.score); $('hBar').style.width = Math.min(100, G.score/GOAL*100) + '%';
+  $('hLives').innerHTML = Array.from({length:LIVES}, (_, i) => '<svg viewBox="0 0 24 24" class="' + (i < G.lives ? 'on' : 'off') + '" aria-hidden="true">' + HEART + '</svg>').join('');
+  $('hLives').setAttribute('aria-label', G.lives + ' de ' + LIVES + ' vidas');
+  const w = WEAPONS[G.w], nx = WEAPONS[G.w + 1];
+  $('wName').textContent = w.name;
+  $('wNext').textContent = nx ? 'Próxima arma em ' + (nx.kills - G.kills) + ' zumbi' + (nx.kills - G.kills === 1 ? '' : 's') : 'Arma máxima';
+  const n = w.n;
+  $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => { const cx = n === 1 ? 18 : 10 + i*9, cy = n === 1 ? 23 : 25 - (i%2)*6, r = n === 1 ? (w.size > .2 ? 14 : 12) : 8;
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + hex(w.color) + '" stroke="#fff" stroke-width="1.5"/>'; }).join('') + '<circle cx="33" cy="7" r="3.5" fill="#ffd36b"/>';
+}
+let bannerT = 0;
+function banner(title, sub, cls){
+  const b = $('banner'); $('bTitle').textContent = title; $('bSub').textContent = sub || '';
+  b.className = 'banner'; void b.offsetWidth; b.className = 'banner show' + (cls ? ' ' + cls : '');
+}
+const tmpV = V();
+function popup(text, local, cls){
+  tmpV.copy(local); world.localToWorld(tmpV); tmpV.project(camera);
+  if(tmpV.z > 1) return;
+  const el = document.createElement('div'); el.className = 'pop' + (cls ? ' ' + cls : ''); el.textContent = text;
+  el.style.left = ((tmpV.x + 1)/2*innerWidth) + 'px'; el.style.top = ((1 - tmpV.y)/2*innerHeight) + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+
+/* ================= Jogo ================= */
+let G = null, mode = 'menu', cast = null;
+const ZS = [], BOMBS = [];
+const RAY = new THREE.Raycaster(), NDC = new THREE.Vector2();
+let aimNDC = new THREE.Vector2(0, 0), aimPoint = null, marker, markerRing, coolT = 0;
+
+function setupScene(){
+  scene.add(new THREE.HemisphereLight(0xfff4e0, 0x6a5a4a, 1.05));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.25); sun.position.set(-4, 9, 6); scene.add(sun);
+  root = new THREE.Group(); world = new THREE.Group(); root.add(world);
+  buildGround(); buildHouse(); buildProps();
+  marker = new THREE.Group(); markerRing = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 40), fxMat(0xffffff, .9)); marker.add(markerRing);
+  const dot = new THREE.Mesh(new THREE.CircleGeometry(.08, 16), fxMat(0xff5a3c, 1)); dot.position.z = .01; marker.add(dot);
+  marker.visible = false; world.add(marker);
+  effect = new OutlineEffect(renderer, {defaultThickness:.0032, defaultColor:[.1, .06, .05], defaultAlpha:1});
+  applyScale();
+}
+function applyScale(){
+  if(!root) return;
+  root.scale.setScalar((AR ? BASE_AR : 1)*GS);
+  house.scale.setScalar(HS);
+  $('oGame').textContent = Math.round(GS*100) + '%'; $('oHouse').textContent = Math.round(HS*100) + '%';
+}
+GS = clamp(parseFloat(LS.get('zgs')) || 1, .3, 3); HS = clamp(parseFloat(LS.get('zhs')) || 1, .7, 1.5);
+$('sGame').value = Math.round(GS*100); $('sHouse').value = Math.round(HS*100);
+$('sGame').addEventListener('input', e => { GS = e.target.value/100; LS.set('zgs', GS); applyScale(); });
+$('sHouse').addEventListener('input', e => { HS = e.target.value/100; LS.set('zhs', HS); applyScale(); });
+$('bSize').addEventListener('click', () => { $('sizer').hidden = !$('sizer').hidden; });
+$('sDone').addEventListener('click', () => { $('sizer').hidden = true; });
+const entryPos = e => e.p.clone().multiplyScalar(HS);
+
+/* ===== Abertura: motoboy entrega a pizza ===== */
+function startIntro(){
+  cast = {t:0};
+  cast.moto = scooter(); cast.moto.rotation.y = Math.PI/2; cast.moto.position.set(-7.5, 0, 5.85); world.add(cast.moto);
+  cast.rider = actor('Knight', 1.05, false); cast.moto.add(cast.rider.g); cast.rider.g.position.set(0, .28, -.18); cast.rider.shadow.visible = false; cast.rider.play('Sit_Chair_Idle');
+  cast.box = pizzaBox(); cast.moto.add(cast.box); cast.box.position.set(0, 1.35, -.62);
+  cast.res = actor('Barbarian', 1.05, false); cast.res.g.visible = false; world.add(cast.res.g); cast.res.play('Idle');
+  engineOn(true);
+}
+function moveTo(A, to, speed, dt, anim, ts){
+  const p = A.g.position, dv = to.clone().sub(p); dv.y = 0; const dist = dv.length();
+  if(dist < .03) return true;
+  A.g.rotation.y = Math.atan2(dv.x, dv.z); A.play(anim || 'Walking_A', {ts:ts || 1});
+  p.addScaledVector(dv, Math.min(1, speed*dt/dist)); return false;
+}
+function updateIntro(dt){
+  const c = cast; c.t += dt; const t = c.t;
+  const stopX = .9, doorP = V(0, 0, d2*HS + .62), inside = V(0, 0, d2*HS - .3);
+  if(t < 3.2){ c.moto.position.x = -7.5 + (stopX + 7.5)*Math.min(1, 1 - Math.pow(1 - t/3.2, 2)); c.moto.position.y = Math.abs(Math.sin(t*14))*.02; }
+  else if(!c.off){ c.off = true; engineOn(false);
+    c.moto.remove(c.rider.g); world.add(c.rider.g); c.rider.g.position.set(stopX - .1, 0, 5.2); c.rider.shadow.visible = true;
+    c.moto.remove(c.box); c.rider.g.add(c.box); c.box.position.set(0, .62, .34); c.box.rotation.set(0, 0, 0);
+  }
+  if(c.off && !c.rang){
+    const path = c.p1 ? doorP : V(.2, 0, 4.6);
+    if(moveTo(c.rider, path, 1.5, dt)){ if(!c.p1) c.p1 = true; else { c.rang = t; c.rider.play('Idle'); c.rider.g.rotation.y = Math.PI; ding(); } }
+  }
+  if(c.rang && t > c.rang + .8 && !c.opened){ c.opened = t; }
+  if(c.opened && !c.resIn){ door.rotation.y = Math.min(1.6, (t - c.opened)*3); }
+  if(c.opened && t > c.opened + .4 && !c.resOut){ c.resOut = t; c.res.g.visible = true; c.res.g.position.copy(inside); c.res.g.rotation.y = 0; }
+  if(c.resOut && !c.got){
+    if(moveTo(c.res, V(0, 0, d2*HS + .05), 1.2, dt)){ c.got = t; c.res.g.rotation.y = 0; c.rider.g.remove(c.box); c.res.g.add(c.box); c.box.position.set(0, .62, .34); c.res.play('Cheer'); c.rider.play('Interact', {once:true}); tone('triangle', 660, 990, .25, .15); }
+  }
+  if(c.got && t > c.got + 1.3){
+    if(!c.back){ c.back = t; }
+    const done = moveTo(c.rider, c.p2 ? V(stopX - .1, 0, 5.2) : V(.2, 0, 4.6), 1.6, dt);
+    if(done && !c.p2) c.p2 = true; else if(done && c.p2 && !c.ride){ c.ride = t; c.rider.g.visible = false; engineOn(true); }
+    if(t > c.got + 1.6 && !c.resIn){ if(moveTo(c.res, inside, 1.2, dt)){ c.resIn = t; c.res.g.visible = false; } }
+  }
+  if(c.resIn && !c.closed){ door.rotation.y = Math.max(0, door.rotation.y - dt*3); if(door.rotation.y <= 0){ c.closed = t; } }
+  if(c.ride){ const k = t - c.ride; c.moto.position.x = stopX + k*k*2.2; if(c.moto.position.x > 7.6){ c.moto.visible = false; engineOn(false); } }
+  if(c.closed && !c.smell){ c.smell = t; banner('Os zumbis sentiram o cheiro da pizza!', 'Proteja a casa', 'slime'); groan(); }
+  if(c.smell){ c.sT = (c.sT || 0) - dt; if(c.sT <= 0 && t < c.smell + 2.4){ c.sT = .16;
+      const src = pick([chimneyTop.clone().multiplyScalar(HS), ...ENTRIES.map(e => V(e.p.x*.8, 1.0, e.p.z*.8).multiplyScalar(HS))]); stink(src); } }
+  if(c.smell && t > c.smell + 2.6) endIntro();
+}
+function endIntro(){
+  if(!cast) return;
+  engineOn(false);
+  [cast.moto, cast.rider.g, cast.res.g].forEach(o => o.parent && o.parent.remove(o));
+  door.rotation.y = 0; cast = null;
+  $('skip').hidden = true;
+  mode = 'play'; showPlayHUD(true);
+  for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
+  G.next = 2.5;
+}
+$('skip').addEventListener('click', () => { if(cast){ if(!cast.smell) banner('Os zumbis sentiram o cheiro da pizza!', 'Proteja a casa', 'slime'); endIntro(); } });
+
+/* ===== Zumbis ===== */
+function spawn(typeKey, fromGrave){
+  const T = TYPES[typeKey]; const key = pick(T.models);
+  const A = actor(key, T.h, !!T.zombie);
+  let pos;
+  if(fromGrave || (!T.climb && Math.random() < .35)){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
+  else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
+  const Z = {T, typeKey, A, hp:T.hp, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0};
+  const ang = Math.atan2(pos.z, pos.x);
+  if(T.climb){
+    const s = pos.z >= 0 ? 1 : -1, x = clamp(pos.x*.22, -1.1, 1.1);
+    const wz = () => s*(d2 + .22)*HS, cx = Math.min(x, CHIM.x - .45);
+    Z.segs = [
+      {to:() => V(x*HS, 0, wz()), sp:T.speed, anim:T.walk, ts:T.ts},
+      {to:() => V(x*HS, (WH - .25)*HS, wz()), sp:.55, anim:'Running_C', ts:.6, face:'house', climb:true},
+      {to:() => V(x*HS, roofY(d2 - .15)*HS, s*(d2 - .15)*HS), sp:1.4, anim:'Jump_Full_Short', ts:1.4, hop:true, once:true},
+      {to:() => V(x*HS, roofY(.12)*HS, s*.12*HS), sp:.5, anim:T.walk, ts:T.ts},
+      {to:() => V(cx*HS, roofY(CHIM.z)*HS, CHIM.z*HS), sp:.5, anim:T.walk, ts:T.ts},
+      {to:() => chimneyTop.clone().multiplyScalar(HS), sp:1.3, anim:'Jump_Full_Short', ts:1.4, hop:true, once:true}
+    ];
+    Z.final = 'chimney';
+  } else {
+    let best = null, bd = 9; ENTRIES.forEach(e => { let d = Math.abs(Math.atan2(Math.sin(e.ang - ang), Math.cos(e.ang - ang))) + Math.random()*.35; if(d < bd){ bd = d; best = e; } });
+    Z.entry = best;
+    Z.segs = [{to:() => entryPos(best), sp:T.speed, anim:T.walk, ts:T.ts}];
+    Z.final = 'break';
+  }
+  A.g.position.copy(pos).setY(-1.1*T.h); A.g.rotation.y = yawTo(pos, V());
+  A.play('Spawn_Ground_Skeletons', {once:true, fade:0});
+  world.add(A.g); ZS.push(Z);
+  puffs(pos.clone().setY(.1), 0x8a6a48, 6, .22, .6);
+  if(Math.random() < .3) groan();
+  if(T.hp > 1){ Z.bar = hpBar(); A.g.add(Z.bar); Z.bar.position.y = T.h + .35; drawBar(Z); }
+  return Z;
+}
+function hpBar(){ const c = document.createElement('canvas'); c.width = 64; c.height = 12; const t = new THREE.CanvasTexture(c); const m = new THREE.SpriteMaterial({map:t, depthWrite:false, transparent:true}); const s = new THREE.Sprite(m); s.scale.set(.6, .11, 1); s.userData.c = c; return s; }
+function drawBar(Z){ const c = Z.bar.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 64, 12); g.fillStyle = 'rgba(0,0,0,.7)'; g.fillRect(0, 0, 64, 12); const n = Z.T.hp, w = (60 - (n - 1)*2)/n; for(let i=0;i<n;i++){ g.fillStyle = i < Z.hp ? '#8fd14f' : '#3a3a3a'; g.fillRect(2 + i*(w + 2), 2, w, 8); } Z.bar.material.map.needsUpdate = true; }
+
+function updateZombie(Z, dt){
+  const A = Z.A, T = Z.T; Z.t += dt;
+  A.mixer.update(dt);
+  if(Z.squash > 0){ Z.squash = Math.max(0, Z.squash - dt*4); const s = 1 + Math.sin(Z.squash*Math.PI)*.18; A.g.scale.set(s, 2 - s, s); }
+  if(Z.state === 'rise'){
+    const k = Math.min(1, Z.t/1.0); A.g.position.y = -1.1*T.h*(1 - k);
+    if(k >= 1){ Z.state = 'move'; Z.t = 0; startSeg(Z); }
+    return;
+  }
+  if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); } return; }
+  if(Z.state === 'move'){
+    const seg = Z.segs[Z.si], B = seg.to(), p = Z.pos;
+    const dv = B.clone().sub(p), dist = dv.length(), step = seg.sp*dt;
+    if(T.blink && Z.si === 0 && dist > 2.5){ Z.blinkT -= dt; if(Z.blinkT <= 0){ Z.blinkT = rand(2.5, 4); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); p.addScaledVector(dv, Math.min(.6, 1.6/dist)); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); } }
+    if(dist <= step){ p.copy(B); Z.si++; if(Z.si >= Z.segs.length){ arrive(Z); return; } Z.segStart = p.clone(); startSeg(Z); }
+    else p.addScaledVector(dv, step/dist);
+    if(seg.hop){ const L0 = Z.segStart ? Z.segStart.distanceTo(B) : 1; const f = 1 - Math.min(1, dist/L0); Z.hy = Math.sin(f*Math.PI)*.45*HS; } else Z.hy = 0;
+    if(seg.face === 'house') turn(A.g, Math.atan2(-p.x*0, -Math.sign(p.z)) , dt);
+    else if(Math.hypot(dv.x, dv.z) > .02) turn(A.g, Math.atan2(dv.x, dv.z), dt);
+    // separação entre zumbis no chão
+    if(Z.si === 0 && p.y < .05) for(const o of ZS){ if(o === Z || o.state === 'dead' || o.pos.y > .05) continue; const dx = p.x - o.pos.x, dz = p.z - o.pos.z, dd = dx*dx + dz*dz; if(dd < .3 && dd > 1e-6){ const k = (.55 - Math.sqrt(dd))*dt*2; p.x += dx*k; p.z += dz*k; } }
+    A.g.position.set(p.x, p.y + Z.hy, p.z); A.shadow.visible = p.y < .05;
+    return;
+  }
+  if(Z.state === 'break'){
+    Z.t += 0; Z.breakT += dt; const e = Z.entry; e.attack = (e.attack || 0) + 1;
+    turn(A.g, yawTo(Z.pos, V(e.p.x*HS*.5, 0, e.p.z*HS*.5)), dt);
+    if(Z.breakT >= (T.breakT || 2.2)) enterHouse(Z);
+    return;
+  }
+  if(Z.state === 'enter'){
+    const k = Math.min(1, Z.t/.5); A.g.scale.setScalar(Math.max(.01, 1 - k)); A.g.position.lerp(V(Z.pos.x*.6, .4, Z.pos.z*.6), dt*4);
+    if(k >= 1) removeZ(Z); return;
+  }
+  if(Z.state === 'chimney'){
+    const k = Math.min(1, Z.t/.7); A.g.position.y = Z.pos.y - k*1.2*HS; A.g.rotation.y += dt*12; A.g.scale.setScalar(Math.max(.01, 1 - k*.8));
+    if(k >= 1) removeZ(Z); return;
+  }
+  if(Z.state === 'dead'){
+    if(Z.fall){ Z.fall.v.y -= 12*dt; Z.pos.addScaledVector(Z.fall.v, dt); if(Z.pos.y <= 0){ Z.pos.y = 0; Z.fall = null; } A.g.position.copy(Z.pos); }
+    if(Z.t > 1.4){ A.g.position.y = Z.pos.y - (Z.t - 1.4)*.9; }
+    if(Z.t > 2.2) removeZ(Z);
+  }
+}
+function startSeg(Z){ const s = Z.segs[Z.si]; if(!Z.segStart) Z.segStart = Z.pos.clone(); Z.A.play(s.anim, {ts:s.ts, once:!!s.once, restart:!!s.once}); }
+function arrive(Z){
+  Z.t = 0;
+  if(Z.final === 'break'){ Z.state = 'break'; Z.breakT = 0; Z.A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); if(Math.random() < .5) groan(); }
+  else { Z.state = 'chimney'; loseLife(Z, 'Entrou pela chaminé!'); }
+}
+function enterHouse(Z){ Z.state = 'enter'; Z.t = 0; loseLife(Z, 'Um zumbi entrou na casa!'); puffs(Z.pos.clone().setY(.6), 0xc39a6b, 8, .18); }
+function removeZ(Z){ world.remove(Z.A.g); Z.state = 'gone'; Z.A.mixer.stopAllAction(); const i = ZS.indexOf(Z); if(i >= 0) ZS.splice(i, 1); }
+function loseLife(Z, msg){
+  if(mode !== 'play') return;
+  G.lives--; G.lost++; ouch(); renderHUD();
+  document.body.classList.remove('hit'); void document.body.offsetWidth; document.body.classList.add('hit');
+  houseShake = .5; popup('-1 vida', V(Z.pos.x, 1.6, Z.pos.z), 'bad');
+  if(G.lives <= 0) gameOver(false); else banner(msg, G.lives + (G.lives === 1 ? ' vida restante' : ' vidas restantes'));
+}
+let houseShake = 0;
+
+function damage(Z, dmg, from){
+  if(mode !== 'play' || ['dead', 'gone', 'enter', 'chimney', 'party'].includes(Z.state)) return;
+  Z.hp -= dmg; Z.squash = 1;
+  if(Z.bar) drawBar(Z);
+  if(Z.hp <= 0) return kill(Z);
+  if(Z.pos.y < .05 && Z.state !== 'break'){ const away = Z.pos.clone().sub(from).setY(0); if(away.lengthSq() > 1e-4){ away.normalize().multiplyScalar(.35); Z.pos.add(away); Z.A.g.position.copy(Z.pos); } }
+  if(Z.state !== 'hit'){ Z.prev = Z.state; } Z.state = 'hit'; Z.hitT = .35; Z.A.play('Hit_A', {once:true, restart:true, fade:.05});
+}
+function kill(Z){
+  const wasHigh = Z.pos.y > .05;
+  Z.state = 'dead'; Z.t = 0; Z.hy = 0;
+  if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; }
+  Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true, fade:.08});
+  if(wasHigh){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; }
+  G.score += Z.T.pts; G.kills++; if(Z.T.strong) G.strong++;
+  popup('+' + Z.T.pts, V(Z.pos.x, Z.pos.y + Z.T.h + .2, Z.pos.z), Z.T.strong ? 'big' : '');
+  const nx = WEAPONS[G.w + 1];
+  if(nx && G.kills >= nx.kills){ G.w++; levelUp(); banner('Nova arma: ' + nx.name + '!', 'Explosão ' + (nx.n > 1 ? 'com ' + nx.n + ' bombas' : 'maior'), ''); }
+  renderHUD();
+  if(G.score >= GOAL) gameOver(true);
+}
+
+/* ===== Bombas ===== */
+const bombGeo = new THREE.SphereGeometry(1, 16, 12), fuseGeo = new THREE.CylinderGeometry(.12, .12, .5, 6), sparkMat = fxMat(0xffd36b);
+function makeBomb(w){
+  const g = new THREE.Group(); const b = new THREE.Mesh(bombGeo, mat(w.color)); g.add(b);
+  const f = new THREE.Mesh(fuseGeo, mat(0xd8c7a0)); f.position.y = 1.1; f.rotation.z = .4; g.add(f);
+  const s = new THREE.Mesh(sphereGeo, sparkMat); s.scale.setScalar(.28); s.position.set(-.2, 1.45, 0); g.add(s); g.userData.spark = s;
+  g.scale.setScalar(w.size); return g;
+}
+function camLocal(){ const p = V(); camera.getWorldPosition(p); return world.worldToLocal(p); }
+function aimAt(ndc){
+  RAY.setFromCamera(ndc, camera);
+  const hits = RAY.intersectObjects(RAYS, false);
+  if(hits.length){ const h = hits[0]; const p = world.worldToLocal(h.point.clone()); const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : V(0, 1, 0); return {p, n, ground:!!h.object.userData.ground}; }
+  // fora do chão: usa o plano do chão
+  const o = world.worldToLocal(RAY.ray.origin.clone()), d = world.worldToLocal(RAY.ray.origin.clone().add(RAY.ray.direction)).sub(o);
+  if(d.y >= -1e-4) return null; const k = -o.y/d.y; const p = o.addScaledVector(d, k);
+  if(Math.hypot(p.x, p.z) > 11) return null; return {p, n:V(0, 1, 0), ground:true};
+}
+function fire(ndc){
+  if(mode !== 'play' || !G || G.paused) return;
+  if(coolT > 0) return;
+  const hit = aimAt(ndc || aimNDC); if(!hit) return;
+  const w = WEAPONS[G.w]; coolT = w.cd; audio();
+  const start = camLocal(); const T0 = hit.p;
+  for(let i=0;i<w.n;i++){
+    const off = i === 0 ? V() : V(Math.cos(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1), 0, Math.sin(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1));
+    const to = T0.clone().add(off); if(i > 0) to.y = Math.max(0, i && hit.ground ? 0 : to.y);
+    const from = start.clone().lerp(to, .55); from.y = Math.max(from.y, to.y + 1.5);
+    const m = makeBomb(w); m.position.copy(from); world.add(m);
+    const dist = from.distanceTo(to);
+    BOMBS.push({m, from, to, t:-i*.08, dur:clamp(.28 + dist*.03, .3, .65), w, arc:clamp(dist*.25, .6, 2.2)});
+  }
+  tone('triangle', 420, 200, .12, .12);
+}
+function updateBombs(dt){
+  for(let i=BOMBS.length-1;i>=0;i--){
+    const b = BOMBS[i]; b.t += dt; if(b.t < 0){ b.m.visible = false; continue; } b.m.visible = true;
+    const k = Math.min(1, b.t/b.dur);
+    b.m.position.lerpVectors(b.from, b.to, k); b.m.position.y += Math.sin(k*Math.PI)*b.arc;
+    b.m.rotation.x += dt*10; b.m.rotation.z += dt*6;
+    b.m.userData.spark.scale.setScalar(.22 + Math.random()*.18);
+    if(k >= 1){ world.remove(b.m); BOMBS.splice(i, 1); explode(b.to, b.w); }
+  }
+}
+function explode(p, w){
+  explosionFX(p, w.R, w.color); boom(w.R > 1.8);
+  for(const Z of ZS.slice()){
+    const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5;
+    if(c.distanceTo(p) < w.R + .25*Z.T.h) damage(Z, w.dmg, p);
+  }
+}
+
+/* ===== Diretor de ondas ===== */
+function pickType(){
+  const opts = Object.entries(TYPES).filter(([k, T]) => G.score >= T.from), sum = opts.reduce((a, [, T]) => a + T.w, 0);
+  let r = Math.random()*sum; for(const [k, T] of opts){ r -= T.w; if(r <= 0) return k; } return 'zumbi';
+}
+function director(dt){
+  const ramp = Math.min(1, G.score/GOAL), alive = ZS.filter(z => z.state !== 'dead').length;
+  for(const [k, T] of Object.entries(TYPES)){ if(T.from > 0 && G.score >= T.from && !G.seen[k]){ G.seen[k] = true; banner('Cuidado!', 'Chegaram os ' + T.label.toLowerCase(), 'slime'); spawn(k); } }
+  G.next -= dt; G.horde -= dt;
+  const interval = 2.5 - 1.75*ramp, maxAlive = 4 + Math.round(10*ramp);
+  if(G.next <= 0 && alive < maxAlive){ spawn(pickType()); G.next = interval*rand(.6, 1.3); }
+  if(G.horde <= 0){ G.horde = rand(34, 44); const n = 3 + Math.round(ramp*5); banner('Horda de zumbis!', n + ' zumbis ao mesmo tempo', 'slime'); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
+}
+
+/* ===== Fluxo ===== */
+function newGame(){
+  ZS.slice().forEach(removeZ); BOMBS.forEach(b => world.remove(b.m)); BOMBS.length = 0;
+  FX.forEach(f => world.remove(f.mesh)); FX.length = 0;
+  G = {score:0, lives:LIVES, kills:0, strong:0, lost:0, w:0, t:0, next:3, horde:38, seen:{}, paused:false};
+  door.rotation.y = 0;
+  $('end').hidden = true; $('start').hidden = true; $('touch').hidden = false;
+  mode = 'intro'; renderHUD(); showPlayHUD(false);
+  $('hud').hidden = false; $('skip').hidden = false;
+  startIntro();
+}
+function showPlayHUD(on){ $('hudB').hidden = !on; $('cross').hidden = !on; marker.visible = false; }
+let endT = 0, endWon = false;
+function gameOver(won){
+  if(mode !== 'play') return;
+  mode = 'ending'; endWon = won; endT = 3.4; showPlayHUD(false); $('sizer').hidden = true;
+  if(won){
+    banner('Casa salva!', '5.000 pontos: a pizza está a salvo');
+    ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
+    boom(true); door.rotation.y = 1.5;
+    const r = actor('Barbarian', 1.05, false); r.g.position.set(0, 0, d2*HS + .3); world.add(r.g); r.play('Cheer'); G.hero = r;
+    const bx = pizzaBox(); r.g.add(bx); bx.position.set(0, .62, .34);
+    confetti(V(0, 2, d2*HS)); levelUp();
+  } else {
+    banner('Os zumbis comeram a pizza!', 'Tente de novo', 'slime');
+    ZS.forEach(Z => { if(Z.state === 'move' || Z.state === 'break' || Z.state === 'hit'){ Z.state = 'party'; Z.A.play(Math.random() < .5 ? 'Cheer' : 'Taunt'); } });
+    groan(); setTimeout(groan, 300);
+  }
+}
+function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; } Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true}); if(Z.pos.y > .05){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; } }
+function showEnd(){
+  mode = 'end';
+  const won = endWon, stars = won ? (G.lives >= 4 ? 3 : G.lives >= 2 ? 2 : 1) : 0;
+  const P = loadP();
+  if(won){ if(stars > (P.stars[1] || 0)) P.stars[1] = stars; if(!SB && P.unlocked < 2) P.unlocked = 2; }
+  if(G.score > (P.best[1] || 0)) P.best[1] = G.score;
+  saveP(P);
+  let info = '';
+  if(won && SB && LS.get('secret')) SB.rpc('game_level_done', {p_secret:LS.get('secret'), p_level:1}).then(() => {}, () => {});
+  if(won) info = SB ? 'A fase 2 libera quando você registrar o adesivo da sua próxima pizza.' : 'Fase 2 liberada neste celular.';
+  $('eTitle').textContent = won ? 'Casa salva!' : 'Os zumbis entraram';
+  $('eStars').innerHTML = [0, 1, 2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
+  $('eScore').textContent = fmt(G.score);
+  const lines = [['Zumbis derrotados', String(G.kills)], ['Zumbis fortes (100 pts)', String(G.strong)], ['Vidas restantes', G.lives + ' de ' + LIVES], ['Melhor arma', WEAPONS[G.w].name]];
+  if(!won) lines.unshift(['Faltaram', fmt(Math.max(0, GOAL - G.score)) + ' pontos']);
+  $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
+  $('eInfo').hidden = !info; $('eInfo').textContent = info; $('eInfo').className = 'info ' + (won ? 'good' : '');
+  $('end').hidden = false; $('touch').hidden = true; $('hud').hidden = true; $('scan').hidden = true;
+}
+function cleanupEnd(){ if(G && G.hero){ world.remove(G.hero.g); G.hero = null; } door.rotation.y = 0; }
+$('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
+$('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
+$('bQuit').addEventListener('click', () => { if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
+  ['hud', 'hudB', 'cross', 'touch', 'scan', 'end', 'skip', 'sizer'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
+
+/* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
+const touchEl = $('touch'), ptrs = new Map();
+let orbit = {az:.35, el:.72, dist:24}, pinch0 = null, drag = null;
+touchEl.addEventListener('pointerdown', e => {
+  audio(); touchEl.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, t:performance.now()});
+  if(ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = {d:Math.hypot(a.x - b.x, a.y - b.y), gs:GS, dist:orbit.dist}; }
+});
+touchEl.addEventListener('pointermove', e => {
+  if(!AR && e.pointerType === 'mouse' && !ptrs.size) setAim3D(e.clientX, e.clientY);
+  const p = ptrs.get(e.pointerId); if(!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if(ptrs.size === 2 && pinch0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
+    if(AR){ GS = clamp(pinch0.gs*r, .3, 3); $('sGame').value = Math.round(GS*100); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 8, 30); return; }
+  if(!AR && ptrs.size === 1){ orbit.az -= dx*.008; orbit.el = clamp(orbit.el + dy*.006, .18, 1.35); }
+});
+function endPtr(e){
+  const p = ptrs.get(e.pointerId); if(!p) return; ptrs.delete(e.pointerId);
+  if(ptrs.size < 2) pinch0 = null;
+  const moved = Math.hypot(p.x - p.x0, p.y - p.y0), quick = performance.now() - p.t < 400;
+  if(moved < 10 && quick && !pinch0){
+    if(AR) fire(aimNDC);
+    else { setAim3D(e.clientX, e.clientY); fire(aimNDC); }
+  }
+}
+touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; });
+touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .3, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 8, 30); }, {passive:false});
+function setAim3D(x, y){ aimNDC.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); const c = $('cross'); c.style.left = x + 'px'; c.style.top = y + 'px'; }
+let holdFire = null;
+$('fire').addEventListener('pointerdown', e => { e.preventDefault(); audio(); fire(aimNDC); clearInterval(holdFire); holdFire = setInterval(() => fire(aimNDC), 90); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(t => $('fire').addEventListener(t, () => clearInterval(holdFire)));
+addEventListener('keydown', e => { if(e.code === 'Space'){ e.preventDefault(); fire(aimNDC); } });
+
+/* ================= Início ================= */
+async function begin(ar){
+  audio(); $('startErr').hidden = true;
+  const btn = ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
+  try{
+    await ready;
+    if(!scene || AR !== ar){
+      if(scene){ location.reload(); return; }
+      AR = ar;
+      if(ar){
+        const { MindARThree } = await import('mindar-image-three');
+        mindar = new MindARThree({container:$('ar'), imageTargetSrc:'targets.mind', uiScanning:'no', uiLoading:'no', uiError:'no', filterMinCF:.0001, filterBeta:.001});
+        ({renderer, scene, camera} = mindar);
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        anchor = mindar.addAnchor(0);
+        anchor.onTargetFound = () => { tracking = true; $('scan').hidden = true; };
+        anchor.onTargetLost = () => { tracking = false; if(mode !== 'menu' && mode !== 'end') $('scan').hidden = false; };
+        setupScene(); root.rotation.x = Math.PI/2; anchor.group.add(root);
+        await mindar.start();
+      } else {
+        $('ar').classList.add('sky');
+        renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; $('ar').appendChild(renderer.domElement);
+        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .1, 200);
+        setupScene(); scene.add(root); tracking = true;
+        addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+      }
+      renderer.setAnimationLoop(loop);
+    }
+    newGame();
+    if(AR && !tracking) $('scan').hidden = false;
+  }catch(err){
+    console.error(err);
+    $('startErr').textContent = ar ? 'Não foi possível abrir a câmera. Verifique a permissão da câmera e se a página está em https. Você pode jogar sem câmera.' : 'Não foi possível montar o jogo neste aparelho.';
+    $('startErr').hidden = false;
+  }
+  btn.disabled = false; btn.textContent = label;
+}
+$('goAR').addEventListener('click', () => begin(true));
+$('go3D').addEventListener('click', () => begin(false));
+
+window.ZG = {FX, camTarget:null, get tracking(){ return tracking; }, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+
+/* ================= Loop ================= */
+let last = performance.now();
+const DTMAX = Math.min(.25, +new URLSearchParams(location.search).get('dtmax') || .05);
+const camTarget = V(0, .2, 1.2); window.ZG.camTarget = camTarget;
+function loop(){
+  const now = performance.now(), dt = Math.min(DTMAX, (now - last)/1000); last = now;
+  const paused = AR && !tracking;
+  if(!AR){
+    const r = orbit.dist; camera.position.set(Math.sin(orbit.az)*Math.cos(orbit.el)*r, Math.sin(orbit.el)*r, Math.cos(orbit.az)*Math.cos(orbit.el)*r);
+    camera.lookAt(camTarget);
+  }
+  if(G && !paused){
+    if(mode === 'intro' && cast){ updateIntro(dt); cast && cast.rider.mixer.update(dt); cast && cast.res.mixer.update(dt); }
+    if(mode === 'play' || mode === 'ending'){
+      G.t += dt; coolT = Math.max(0, coolT - dt);
+      if(mode === 'play') director(dt);
+      ENTRIES.forEach(e => e.attack = 0);
+      for(const Z of ZS.slice()){ if(Z.state === 'party'){ Z.A.mixer.update(dt); continue; } updateZombie(Z, dt); }
+      ENTRIES.forEach(e => { if(e.door) e.obj.rotation.y = e.attack ? Math.sin(G.t*30)*.08 : 0; else e.obj.rotation.z = e.attack ? Math.sin(G.t*32)*.07 : 0; });
+      updateBombs(dt);
+      if(G.hero) G.hero.mixer.update(dt);
+      if(mode === 'ending'){ endT -= dt; if(endT <= 0) showEnd(); }
+    }
+    if(mode === 'play'){
+      const h = aimAt(aimNDC);
+      if(h){ marker.visible = true;
+        const nl = world.worldToLocal(world.localToWorld(V()).add(h.n)).normalize();
+        marker.position.copy(h.p).addScaledVector(nl, .04); marker.quaternion.setFromUnitVectors(V(0, 0, 1), nl);
+        const R = WEAPONS[G.w].R; marker.scale.setScalar(R*(1 + Math.sin(now/120)*.04)); markerRing.material.color.setHex(coolT > 0 ? 0x999999 : 0xffffff); }
+      else marker.visible = false;
+      $('cross').classList.toggle('cool', coolT > 0);
+    }
+    updateFX(dt);
+    if(houseShake > 0){ houseShake = Math.max(0, houseShake - dt); house.position.set(Math.sin(now/18)*.06*houseShake*2, 0, Math.cos(now/23)*.05*houseShake*2); } else house.position.set(0, 0, 0);
+    if(shake > 0){ shake = Math.max(0, shake - dt*.8); world.position.set(rand(-1, 1)*shake*.25, 0, rand(-1, 1)*shake*.25); } else world.position.set(0, 0, 0);
+    if(Math.random() < dt*1.5 && mode !== 'menu'){ const s = new THREE.Mesh(puffGeo, mat(0xe8e4e0)); s.position.copy(chimneyTop).multiplyScalar(HS); const sz = rand(.1, .16);
+      fx(s, 2, (f, k, d) => { s.position.y += d*.6; s.position.x += d*.15; s.scale.setScalar(sz*(1 + k*1.5)*(k > .8 ? (1 - k)*5 : 1)); }); }
+  }
+  effect.render(scene, camera);
+}
+</script>
+</body>
+</html>
