@@ -10,8 +10,6 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { PGlite } from '@electric-sql/pglite';
-import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import selfsigned from 'selfsigned';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -28,31 +26,74 @@ function lanIPs(){
   return out;
 }
 const IPS = lanIPs();
-const LAN = process.env.HOST_IP || IPS.find(ip => ip.startsWith('192.168.')) || IPS[0] || 'localhost';
+const IN_DOCKER = !!process.env.DATABASE_URL;
+const LAN = process.env.HOST_IP || (IN_DOCKER ? 'localhost' : (IPS.find(ip => ip.startsWith('192.168.')) || IPS[0] || 'localhost'));
+// Endereço que vai dentro dos QR Codes. No Docker sem HOST_IP, usa o endereço pelo qual o painel foi aberto.
+const FIXED_GAME = (process.env.HOST_IP || !IN_DOCKER) ? `https://${LAN}:${PORT}/` : null;
+const CERT_IPS = [...new Set([...(process.env.HOST_IP ? [process.env.HOST_IP] : []), ...IPS])];
 
 /* ---------- Certificado HTTPS (o celular só libera a câmera em https) ---------- */
 const certFile = path.join(DATA, 'certificado.json');
 let cert = fs.existsSync(certFile) ? JSON.parse(fs.readFileSync(certFile, 'utf8')) : null;
-if(!cert || cert.ip !== LAN){
+if(!cert || cert.ip !== LAN || cert.ips !== CERT_IPS.join(',')){
   const pems = await selfsigned.generate([{ name:'commonName', value:'Monte a Pizza local' }], {
     days:825, keySize:2048, algorithm:'sha256',
-    extensions:[{ name:'subjectAltName', altNames:[{ type:2, value:'localhost' }, { type:7, ip:'127.0.0.1' }, ...IPS.map(ip => ({ type:7, ip }))] }]
+    extensions:[{ name:'subjectAltName', altNames:[{ type:2, value:'localhost' }, { type:7, ip:'127.0.0.1' }, ...CERT_IPS.map(ip => ({ type:7, ip }))] }]
   });
-  cert = { ip:LAN, key:pems.private, cert:pems.cert };
+  cert = { ip:LAN, ips:CERT_IPS.join(','), key:pems.private, cert:pems.cert };
   fs.writeFileSync(certFile, JSON.stringify(cert));
 }
 
-/* ---------- Banco de dados (Postgres embutido, gravado em ./dados/banco) ---------- */
-const db = new PGlite(path.join(DATA, 'banco'), { extensions:{ pgcrypto } });
-await db.waitReady;
-const ready = (await db.query(`select 1 from information_schema.schemata where schema_name = 'crm'`)).rows.length > 0;
+/* ---------- Banco de dados ----------
+   Com DATABASE_URL (Docker): PostgreSQL de verdade.
+   Sem DATABASE_URL: Postgres embutido, gravado em ./dados/banco. */
+let DB;
+if(IN_DOCKER){
+  const pg = (await import('pg')).default;
+  const pool = new pg.Pool({ connectionString:process.env.DATABASE_URL, max:10 });
+  for(let i = 0; ; i++){ try{ await pool.query('select 1'); break; }catch(e){ if(i > 30) throw e; console.log('Aguardando o banco de dados…'); await new Promise(r => setTimeout(r, 2000)); } }
+  DB = {
+    query:(sql, params) => pool.query(sql, params),
+    exec:async sql => { const r = await pool.query(sql); return Array.isArray(r) ? r : [r]; },
+    asRole:async (uid, fn) => {
+      const c = await pool.connect();
+      try{
+        await c.query('begin');
+        await c.query(`set local role ${uid ? 'authenticated' : 'anon'}`);
+        await c.query(`select set_config('app.uid', $1, true)`, [uid || '']);
+        const out = await fn((sql, params) => c.query(sql, params));
+        await c.query('commit'); return out;
+      }catch(e){ await c.query('rollback').catch(() => {}); throw e; }
+      finally{ c.release(); }
+    }
+  };
+} else {
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { pgcrypto } = await import('@electric-sql/pglite/contrib/pgcrypto');
+  const lite = new PGlite(path.join(DATA, 'banco'), { extensions:{ pgcrypto } });
+  await lite.waitReady;
+  let chain = Promise.resolve();
+  const serial = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
+  DB = {
+    query:(sql, params) => serial(() => lite.query(sql, params)),
+    exec:sql => serial(() => lite.exec(sql)),
+    asRole:(uid, fn) => serial(async () => {
+      await lite.exec(`set role ${uid ? 'authenticated' : 'anon'}`);
+      await lite.query(`select set_config('app.uid', $1, false)`, [uid || '']);
+      try{ return await fn((sql, params) => lite.query(sql, params)); }
+      finally{ await lite.exec('reset role'); }
+    })
+  };
+}
+const ready = (await DB.query(`select 1 from information_schema.schemata where schema_name = 'crm'`)).rows.length > 0;
 let firstCode = null;
 if(!ready){
-  await db.exec(`
+  await DB.exec(`
     do $$ begin
       if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon; end if;
       if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated; end if;
     end $$;
+    create extension if not exists pgcrypto;
     create schema if not exists auth;
     create or replace function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('app.uid', true), '')::uuid $$;
     grant usage on schema auth to anon, authenticated;
@@ -60,11 +101,11 @@ if(!ready){
     create table if not exists auth.local_users (
       id uuid primary key default gen_random_uuid(), email text unique not null, pass text not null,
       refresh text, created_at timestamptz default now());`);
-  const res = await db.exec(fs.readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8'));
+  const res = await DB.exec(fs.readFileSync(path.join(ROOT, 'supabase', 'schema.sql'), 'utf8'));
   firstCode = res[res.length - 1].rows[0];
 }
 
-const CODES = (await db.query(`select name, prefix, join_code from crm.pizzerias order by created_at`)).rows;
+const CODES = (await DB.query(`select name, prefix, join_code from crm.pizzerias order by created_at`)).rows;
 
 /* ---------- Login (senha com scrypt, sessão assinada) ---------- */
 const keyFile = path.join(DATA, 'chave.secreta');
@@ -92,9 +133,6 @@ function session(u, refresh){
   return { access_token:sign({ sub:u.id, email:u.email, role:'authenticated', aud:'authenticated', exp }), token_type:'bearer', expires_in:7*DAY, expires_at:exp, refresh_token:refresh, user };
 }
 
-/* Fila: o banco embutido atende uma consulta por vez */
-let chain = Promise.resolve();
-const serial = fn => { const p = chain.then(fn); chain = p.catch(() => {}); return p; };
 const SETOF = new Set(['staff_create_batch', 'staff_batch_stickers']);
 const ALLOWED = /^(game|staff)_[a-z_]+$/;
 
@@ -102,15 +140,9 @@ async function rpc(fn, args, uid){
   if(!ALLOWED.test(fn)) throw new Error('Função não permitida');
   const keys = Object.keys(args || {}).filter(k => /^p_[a-z_]+$/.test(k));
   const list = keys.map((k, i) => `${k} => $${i + 1}`).join(', ');
-  return serial(async () => {
-    await db.exec(`set role ${uid ? 'authenticated' : 'anon'}`);
-    await db.query(`select set_config('app.uid', $1, false)`, [uid || '']);
-    try{
-      if(SETOF.has(fn)) return (await db.query(`select * from public.${fn}(${list})`, keys.map(k => args[k]))).rows;
-      return (await db.query(`select public.${fn}(${list}) as v`, keys.map(k => args[k]))).rows[0].v;
-    } finally {
-      await db.exec('reset role');
-    }
+  return DB.asRole(uid, async q => {
+    if(SETOF.has(fn)) return (await q(`select * from public.${fn}(${list})`, keys.map(k => args[k]))).rows;
+    return (await q(`select public.${fn}(${list}) as v`, keys.map(k => args[k]))).rows[0].v;
   });
 }
 
@@ -129,26 +161,26 @@ const server = https.createServer({ key:cert.key, cert:cert.cert }, async (req, 
     /* Configuração para as páginas: aponta para este próprio servidor */
     if(url.pathname === '/config.js'){
       res.writeHead(200, { 'Content-Type':'text/javascript; charset=utf-8', 'Cache-Control':'no-store' });
-      return res.end(`window.PIZZA_CONFIG={SUPABASE_URL:location.origin,SUPABASE_ANON_KEY:'local',GAME_URL:${JSON.stringify(`https://${LAN}:${PORT}/`)}};`);
+      return res.end(`window.PIZZA_CONFIG={SUPABASE_URL:location.origin,SUPABASE_ANON_KEY:'local',GAME_URL:${FIXED_GAME ? JSON.stringify(FIXED_GAME) : "location.origin+'/'"}};`);
     }
     /* Login */
     if(url.pathname === '/auth/v1/signup'){
       const { email, password } = data();
       if(!email || !password || password.length < 6) return json(422, { msg:'Password should be at least 6 characters', error_code:'weak_password' });
-      const ex = await serial(() => db.query(`select 1 from auth.local_users where email = lower($1)`, [email]));
+      const ex = await DB.query(`select 1 from auth.local_users where email = lower($1)`, [email]);
       if(ex.rows.length) return json(422, { msg:'User already registered', error_code:'user_already_exists' });
       const refresh = crypto.randomBytes(24).toString('hex');
-      const u = (await serial(() => db.query(`insert into auth.local_users (email, pass, refresh) values (lower($1), $2, $3) returning *`, [email, hashPass(password), refresh]))).rows[0];
+      const u = (await DB.query(`insert into auth.local_users (email, pass, refresh) values (lower($1), $2, $3) returning *`, [email, hashPass(password), refresh])).rows[0];
       return json(200, session(u, refresh));
     }
     if(url.pathname === '/auth/v1/token'){
       const d = data(), grant = url.searchParams.get('grant_type');
       if(grant === 'refresh_token'){
-        const u = (await serial(() => db.query(`select * from auth.local_users where refresh = $1`, [d.refresh_token || '']))).rows[0];
+        const u = (await DB.query(`select * from auth.local_users where refresh = $1`, [d.refresh_token || ''])).rows[0];
         if(!u) return json(400, { error:'invalid_grant', error_description:'Invalid Refresh Token', msg:'Invalid Refresh Token' });
         return json(200, session(u, u.refresh));
       }
-      const u = (await serial(() => db.query(`select * from auth.local_users where email = lower($1)`, [d.email || '']))).rows[0];
+      const u = (await DB.query(`select * from auth.local_users where email = lower($1)`, [d.email || ''])).rows[0];
       if(!u || !checkPass(d.password || '', u.pass)) return json(400, { error:'invalid_grant', error_description:'Invalid login credentials', msg:'Invalid login credentials' });
       return json(200, session(u, u.refresh));
     }
@@ -190,5 +222,5 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`  é normal num servidor local. Toque em "Avançado" / "Mostrar detalhes"`);
   console.log(`  e depois em "Continuar" / "visitar este site".`);
   console.log(`\n  O celular precisa estar no mesmo Wi-Fi deste computador.`);
-  console.log(`  Para parar: Ctrl+C. Os dados ficam em local/dados.\n` + line + '\n');
+  console.log(IN_DOCKER ? `  Banco: PostgreSQL no contêiner "db" (porta 5432).\n` + line + '\n' : `  Para parar: Ctrl+C. Os dados ficam em local/dados.\n` + line + '\n');
 });

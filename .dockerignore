@@ -1,0 +1,4 @@
+.git
+local/node_modules
+local/dados
+*.zip

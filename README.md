@@ -13,7 +13,34 @@ libera a próxima fase. Quem escanear um adesivo já usado joga só a fase 1.
 | `adesivo-arte.png`, `targets.mind` | Arte do adesivo e marcador de AR |
 | `models.glb` | Ingredientes 3D (KayKit, de Kay Lousberg, CC0) |
 
-## Rodar no seu computador (sem nuvem)
+## Rodar com Docker (PostgreSQL no seu computador)
+
+Sobe dois contêineres: **db** (PostgreSQL 16, com os dados num volume) e **app**
+(servidor do painel, do jogo, do login e das regras).
+
+1. Instale e abra o **Docker Desktop** (https://www.docker.com/products/docker-desktop).
+2. Na pasta do projeto, dê dois cliques em **`iniciar-docker.bat`** (Windows) ou
+   **`iniciar-docker.command`** (Mac). Ele descobre o endereço do computador na rede,
+   sobe tudo e abre o painel. A primeira vez demora alguns minutos.
+3. O **código da equipe** aparece na janela (ou rode `docker compose logs app`).
+4. No navegador, aceite o aviso do certificado (*Avançado → Continuar*), vá em
+   **Criar acesso** com o código da equipe e gere os adesivos.
+
+Comandos úteis, na pasta do projeto:
+
+| Para | Comando |
+| --- | --- |
+| Subir | `docker compose up -d --build` |
+| Ver o código da equipe | `docker compose logs app` |
+| Desligar (mantém os dados) | `docker compose down` |
+| Apagar tudo e começar do zero | `docker compose down -v` |
+| Abrir o banco no pgAdmin/DBeaver | `localhost:5432`, banco `montepizza`, usuário `pizza`, senha `pizza_local_123` |
+
+Importante: abra o painel pelo endereço da rede (ex.: `https://192.168.0.10:8443/painel.html`),
+que é o que o script abre. Os QR Codes impressos apontam para esse endereço, e é por ele
+que o celular acessa.
+
+## Rodar sem Docker (banco embutido)
 
 A pasta `local/` tem um servidor que faz o papel da nuvem: banco de dados,
 login do painel e as mesmas regras anti-trapaça. Os dados ficam em `local/dados`.

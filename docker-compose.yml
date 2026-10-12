@@ -1,0 +1,40 @@
+# Monte a Pizza · banco PostgreSQL + servidor do painel e do jogo
+# Subir:  docker compose up -d --build      Ver o código da equipe:  docker compose logs app
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: montepizza
+      POSTGRES_USER: pizza
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-pizza_local_123}
+    volumes:
+      - banco:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"   # para abrir o banco no pgAdmin/DBeaver (usuário pizza)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pizza -d montepizza"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: local/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://pizza:${DB_PASSWORD:-pizza_local_123}@db:5432/montepizza
+      HOST_IP: ${HOST_IP:-}
+      PORT: "8443"
+    ports:
+      - "8443:8443"
+    volumes:
+      - chaves:/app/local/dados
+
+volumes:
+  banco:
+  chaves:
