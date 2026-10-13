@@ -420,9 +420,25 @@ function ding(){
 }
 /* "Ehhhhh!" dos moradores: voz com formantes da vogal "é", tom subindo de alegria */
 const VOZ = {pai:{f0:135, f:[560, 1720, 2450]}, mae:{f0:240, f:[620, 2050, 2900]}, filho:{f0:330, f:[680, 2250, 3200]}};
+/* Voz humana do próprio celular (síntese de fala do sistema, em português) */
+let ptVoice = null;
+function pickVoice(){ try{ const vs = speechSynthesis.getVoices(); ptVoice = vs.find(v => /pt[-_]BR/i.test(v.lang)) || vs.find(v => /^pt/i.test(v.lang)) || null; }catch(e){} }
+if(window.speechSynthesis){ pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function speakCheer(who){
+  if(muted || !window.speechSynthesis) return;
+  try{
+    const u = new SpeechSynthesisUtterance('Êêêêê!');
+    u.lang = 'pt-BR'; if(ptVoice) u.voice = ptVoice;
+    u.pitch = {pai:.7, mae:1.35, filho:1.9}[who] || 1; u.rate = .85; u.volume = 1;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+// o iPhone só libera a fala depois de um toque: "acorda" a síntese no primeiro toque, em silêncio
+addEventListener('pointerdown', function wake(){ try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){} removeEventListener('pointerdown', wake); }, {passive:true});
 function cheerVoice(who, p){
   if(!ok()) return;
-  if(SAMPLES[who]){ sample(who, 1.2, rand(.97, 1.03), panOf(p), .25); }   // só voz gravada do morador (a sintetizada foi retirada)
+  if(SAMPLES[who]){ sample(who, 1.2, rand(.97, 1.03), panOf(p), .25); return; }   // voz gravada, se houver
+  speakCheer(who);
   return;
   const v = VOZ[who] || VOZ.pai, t = AC.currentTime + rand(0, .06), dur = rand(1.05, 1.35), pan = panOf(p);
   const src = AC.createOscillator(); src.type = 'sawtooth';
@@ -887,7 +903,7 @@ function updateParty(dt){
     if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = .15 + i*.25; } return; }
     // "Ehhhhh!": grita e dá um pulão de alegria
     m.yell -= dt;
-    if(m.yell <= 0){ m.yell = rand(2.2, 3.2); m.big = .9; cheerVoice(m.voice, A.g.position); popup('Ehhhhh!', V(A.g.position.x, m.h + .7, A.g.position.z), 'yay'); }
+    if(m.yell <= 0 && !m.yelled){ m.yelled = true; m.big = .9; cheerVoice(m.voice, A.g.position); popup('Ehhhhh!', V(A.g.position.x, m.h + .7, A.g.position.z), 'yay'); }
     if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.9; A.play('Jump_Full_Short', {ts:1.1}); A.g.position.y = Math.sin(q*Math.PI)*1.05*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.5)); A.g.rotation.y = 0; if(A.box) A.box.rotation.y += dt*8; return; }
     // pula e comemora sem parar, cada um no seu ritmo
     const k = (t*1.6 + m.ph) % 2;
