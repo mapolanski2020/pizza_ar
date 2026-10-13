@@ -75,6 +75,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .pop{position:fixed;transform:translate(-50%,-50%);font-weight:800;font-size:20px;color:var(--crust);text-shadow:0 2px 6px rgba(0,0,0,.85);pointer-events:none;animation:rise 1s ease-out forwards;z-index:4;font-variant-numeric:tabular-nums;white-space:nowrap}
 .pop.big{font-family:var(--display);font-weight:400;font-size:26px;color:#ffe08a}
 .pop.bad{color:#ffb4aa}
+.pop.yay{font-family:var(--display);font-weight:400;font-size:24px;color:#fff;background:#ff5a3c;border:3px solid #fff;border-radius:18px;padding:2px 12px;box-shadow:0 4px 10px rgba(0,0,0,.4);animation:yay 1.2s ease-out forwards}
+@keyframes yay{0%{opacity:0;transform:translate(-50%,-30%) scale(.4)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}25%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-90%) scale(1)}}
 @keyframes rise{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-56px}}
 /* Tutorial rápido: celular inclinando sobre a mesa e dedinho tocando */
 .guide{position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 24px calc(150px + env(safe-area-inset-bottom,0px));pointer-events:none;text-align:center}
@@ -413,6 +415,22 @@ const levelUp = () => { sample('arma', 1, 1, 0, .25); };
 function ding(){
   if(!ok()) return;
   [[659.3, 0], [523.3, .45]].forEach(([f, d]) => [1, 2.76, 5.4, 8.93].forEach((r, i) => tone('sine', f*r, 0, 1.6 - i*.3, [.28, .1, .05, .025][i], d, .2, .35)));
+}
+/* "Ehhhhh!" dos moradores: voz com formantes da vogal "é", tom subindo de alegria */
+const VOZ = {pai:{f0:135, f:[560, 1720, 2450]}, mae:{f0:240, f:[620, 2050, 2900]}, filho:{f0:330, f:[680, 2250, 3200]}};
+function cheerVoice(who, p){
+  if(!ok()) return; const v = VOZ[who] || VOZ.pai, t = AC.currentTime + rand(0, .06), dur = rand(1.05, 1.35), pan = panOf(p);
+  const src = AC.createOscillator(); src.type = 'sawtooth';
+  src.frequency.setValueAtTime(v.f0*.9, t); src.frequency.exponentialRampToValueAtTime(v.f0*1.35, t + .28);
+  src.frequency.setValueAtTime(v.f0*1.35, t + dur*.6); src.frequency.exponentialRampToValueAtTime(v.f0*1.1, t + dur);
+  const vib = AC.createOscillator(), vg = AC.createGain(); vib.frequency.value = rand(5.5, 6.5); vg.gain.value = v.f0*.03; vib.connect(vg).connect(src.frequency);
+  const br = noise(), bf = AC.createBiquadFilter(), bg = AC.createGain(); bf.type = 'highpass'; bf.frequency.value = 2500; bg.gain.value = .06; br.connect(bf).connect(bg);
+  const mix = AC.createGain(); src.connect(mix); bg.connect(mix);
+  const voice = AC.createGain();
+  v.f.forEach((f, i) => { const bp = AC.createBiquadFilter(), g = AC.createGain(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = [6, 9, 12][i]; g.gain.value = [2.4, 1.4, .6][i]; mix.connect(bp).connect(g).connect(voice); });
+  voice.gain.setValueAtTime(.0001, t); voice.gain.exponentialRampToValueAtTime(.55, t + .07); voice.gain.setValueAtTime(.55, t + dur*.75); voice.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  out(voice, pan, .35);
+  [src, vib, br].forEach(o => { o.start(t); o.stop(t + dur + .05); });
 }
 function horn(){ if(!ok()) return; [0, .22].forEach(d => { [349, 440].forEach(f => { const t = AC.currentTime + d, o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'square'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = 1400; env(g, t, .01, .09, .16); o.connect(lp).connect(g); out(g, .3, .2); o.start(t); o.stop(t + .25); }); }); }
 function fireworkSnd(p){
@@ -849,7 +867,7 @@ function startParty(){
   ].map((m, i) => {
     const A = actor(m.key, m.h, false); A.g.position.set(0, 0, d2*HS - .2); A.g.visible = false; world.add(A.g);
     if(m.box){ const b = pizzaBox(); A.g.add(b); b.position.set(0, m.h*.95 + .1, .1); b.rotation.x = -.2; A.box = b; }
-    return {A, home:V(m.x, 0, d2*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h};
+    return {A, home:V(m.x, 0, d2*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h, voice:['pai', 'mae', 'filho'][i], yell:0};
   });
   const moto = scooter(); moto.rotation.y = Math.PI/2; moto.position.set(-8, 0, 5.85); world.add(moto);
   const rider = actor('Knight', 1.05, false); moto.add(rider.g); rider.g.position.set(0, .28, -.18); rider.shadow.visible = false; rider.play('Sit_Chair_Idle');
@@ -862,7 +880,11 @@ function updateParty(dt){
     const A = m.A; A.mixer.update(dt);
     if(t < m.out) return;
     A.g.visible = true;
-    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; } return; }
+    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = .15 + i*.25; } return; }
+    // "Ehhhhh!": grita e dá um pulão de alegria
+    m.yell -= dt;
+    if(m.yell <= 0){ m.yell = rand(2.2, 3.2); m.big = .9; cheerVoice(m.voice, A.g.position); popup('Ehhhhh!', V(A.g.position.x, m.h + .7, A.g.position.z), 'yay'); }
+    if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.9; A.play('Jump_Full_Short', {ts:1.1}); A.g.position.y = Math.sin(q*Math.PI)*1.05*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.5)); A.g.rotation.y = 0; if(A.box) A.box.rotation.y += dt*8; return; }
     // pula e comemora sem parar, cada um no seu ritmo
     const k = (t*1.6 + m.ph) % 2;
     if(k < 1){ A.play('Jump_Full_Short', {ts:1.3}); A.g.position.y = Math.sin(k*Math.PI)*.55*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(k*Math.PI)*.4)); }
