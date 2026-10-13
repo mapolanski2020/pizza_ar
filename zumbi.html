@@ -34,9 +34,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .score .k,.weapon small{color:#fff!important}
 .card,.ghost,.tip,.guide p{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(6px)}
-.score{padding:8px 12px;min-width:150px}
+.score{padding:6px 10px;width:104px}
 .score .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);font-weight:800;display:flex;justify-content:space-between;gap:8px}
-.score .v{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
+.score .v{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1}
 .bar{height:7px;border-radius:99px;background:var(--slot);overflow:hidden;margin-top:5px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--slime),var(--crust));border-radius:99px;transition:width .25s}
 .side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
@@ -109,7 +109,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 @media (prefers-reduced-motion:reduce){.guide .phone,.guide .table i,.finger i,.finger::before{animation:none}.guide .phone{transform:rotateX(48deg)}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
-.skip{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:4}
+.quit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:4;pointer-events:auto}
+.skip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:4}
 .sizer{position:fixed;left:14px;right:14px;bottom:calc(120px + env(safe-area-inset-bottom,0px));z-index:5;margin:0 auto;max-width:420px;padding:14px;display:flex;flex-direction:column;gap:12px}
 .sizer label{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ash)}
 .sizer label span{display:flex;justify-content:space-between}
@@ -164,14 +165,13 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
 <div id="cross" hidden><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="20" fill="none" stroke="#fff" stroke-width="3.5"/><circle cx="32" cy="32" r="3.5" fill="#ff5a3c"/><path d="M32 4v12M32 48v12M4 32h12M48 32h12" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg></div>
 
 <div class="top" id="hud" hidden>
-  <div class="card score"><div class="k"><span>Pontos</span><span id="hGoal">meta 5.000</span></div><div class="v" id="hScore">0</div><div class="bar"><i id="hBar"></i></div></div>
+  <div class="card score"><div class="k"><span>Pontos</span></div><div class="v" id="hScore">0</div><div class="bar"><i id="hBar"></i></div></div>
   <div class="side">
     <div class="hearts" id="hLives" aria-label="Vidas"></div>
     <div class="tools">
       <button class="ghost" id="bSound" type="button" aria-label="Som">Som</button>
       <button class="ghost" id="bSize" type="button" hidden>Tamanho</button>
       <button class="ghost" id="bPlace" type="button" hidden>Reposicionar</button>
-      <button class="ghost" id="bQuit" type="button">Sair</button>
     </div>
   </div>
 </div>
@@ -186,6 +186,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
   <button class="btn primary" id="sDone" type="button">Pronto</button>
 </div>
 <button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
+<button class="ghost quit" id="bQuit" type="button" hidden>Sair</button>
 <div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa. Depois de aparecer, a casa fica fixa no lugar.</p></div>
 <div class="guide" id="xrHint" hidden>
   <div class="scene" id="gScene" aria-hidden="true"><div class="table"><i></i></div><div class="phone"><b></b></div></div>
@@ -1293,7 +1294,7 @@ function newGame(){
   door.rotation.y = 0;
   $('end').hidden = true; $('start').hidden = true; $('touch').hidden = false;
   mode = 'intro'; renderHUD(); showPlayHUD(false);
-  $('hud').hidden = false; $('skip').hidden = false;
+  $('hud').hidden = false; $('skip').hidden = false; $('bQuit').hidden = false;
   startIntro();
 }
 let wT = 0;
@@ -1333,13 +1334,13 @@ function showEnd(){
   $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
   $('eInfo').hidden = !info; $('eInfo').textContent = info; $('eInfo').className = 'info ' + (won ? 'good' : '');
   $('end').classList.toggle('won', won);
-  $('end').hidden = false; $('touch').hidden = true; $('hud').hidden = true; $('scan').hidden = true;
+  $('end').hidden = false; $('touch').hidden = true; $('hud').hidden = true; $('bQuit').hidden = true; $('scan').hidden = true;
 }
 function cleanupEnd(){ endParty(); music(null); door.rotation.y = 0; }
 $('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
 $('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
 $('bQuit').addEventListener('click', () => { tutOff(); music(null); if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
-  ['hud', 'hudB', 'cross', 'touch', 'scan', 'xrHint', 'end', 'skip', 'sizer'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
+  ['hud', 'hudB', 'cross', 'touch', 'scan', 'xrHint', 'end', 'skip', 'sizer', 'bQuit'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
 
 /* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
 const touchEl = $('touch'), ptrs = new Map();
