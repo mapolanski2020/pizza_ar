@@ -1531,7 +1531,7 @@ function loop(time, frame){
     }
     if(mode === 'play'){
       const h = aimAt(aimNDC);
-      if(h){ marker.visible = true;
+      if(h){ marker.visible = false; // só a mira principal (sem a do terreno)
         const nl = world.worldToLocal(world.localToWorld(V()).add(h.n)).normalize();
         marker.position.copy(h.p).addScaledVector(nl, .04); marker.quaternion.setFromUnitVectors(V(0, 0, 1), nl);
         const R = WEAPONS[G.w].R; marker.scale.setScalar(R*(1 + Math.sin(now/120)*.04)); markerRing.material.color.setHex(coolT > 0 ? 0x999999 : 0xffffff); }
