@@ -100,6 +100,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 @keyframes tapRing{0%,40%{opacity:0;transform:scale(.4)}50%{opacity:1}100%{opacity:0;transform:scale(1.4)}}
 .tip{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom,0px));width:min(320px,calc(100% - 32px));background:var(--panel);border:1px solid var(--crust);border-radius:16px;padding:11px 14px;font-size:14.5px;line-height:1.4;text-align:center;pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.4)}
 .tip b{color:var(--crust)}
+.zoomPill{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:7;background:var(--panel);border:1px solid var(--crust);border-radius:999px;padding:7px 16px;font-weight:800;font-size:15px;pointer-events:none;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.guide .phone,.guide .table i,.finger i,.finger::before{animation:none}.guide .phone{transform:rotateX(48deg)}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
@@ -187,6 +188,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
 </div>
 <div class="finger" id="finger" hidden aria-hidden="true"><i></i></div>
 <div class="tip" id="tip" hidden role="status"></div>
+<div class="zoomPill" id="zoomPill" hidden aria-live="polite"></div>
 <div class="banner" id="banner" aria-live="polite"><b id="bTitle"></b><span id="bSub"></span></div>
 
 <section class="screen" id="start">
@@ -1330,7 +1332,7 @@ touchEl.addEventListener('pointermove', e => {
   if(ptrs.size === 2 && pinch0 && !tp0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
     let da = Math.atan2(b.y - a.y, b.x - a.x) - pinch0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
     world.rotation.y = pinch0.ry - da;
-    if(AR){ GS = clamp(pinch0.gs*r, .15, 3); $('sGame').value = Math.round(GS*100); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 8, 30); return; }
+    if(AR){ GS = clamp(pinch0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 6, 40); showZoom(); return; }
   if(!AR && ptrs.size === 1){ orbit.az -= dx*.008; orbit.el = clamp(orbit.el + dy*.006, .18, 1.35); }
 });
 function endPtr(e){
@@ -1346,7 +1348,7 @@ function endPtr(e){
   }
 }
 touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; if(!ptrs.size) multi = false; });
-touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .15, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 8, 30); }, {passive:false});
+touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .15, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 6, 40); showZoom(); }, {passive:false});
 function setAim3D(x, y){ aimNDC.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); const c = $('cross'); c.style.left = x + 'px'; c.style.top = y + 'px'; }
 /* iPhone: o Safari usa a pinça para dar zoom na página; aqui ela vai para o jogo */
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive:false}));
@@ -1357,8 +1359,11 @@ touchEl.addEventListener('touchmove', e => {
   if(e.touches.length !== 2 || !tp0) return; e.preventDefault();
   const g = twoTouch(e), r = g.d/Math.max(1, tp0.d); let da = g.ang - tp0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
   world.rotation.y = tp0.ry - da;
-  if(AR){ GS = clamp(tp0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(tp0.dist/r, 8, 30);
+  if(AR){ GS = clamp(tp0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(tp0.dist/r, 6, 40);
+  showZoom();
 }, {passive:false});
+let zoomT = 0;
+function showZoom(){ const z = AR ? GS : 24/orbit.dist; const el = $('zoomPill'); el.textContent = 'Zoom ' + Math.round(z*100) + '%  ·  giro ' + Math.round(((-world.rotation.y*180/Math.PI)%360 + 360)%360) + '°'; el.hidden = false; clearTimeout(zoomT); zoomT = setTimeout(() => el.hidden = true, 900); }
 touchEl.addEventListener('touchend', e => { if(e.touches.length < 2) tp0 = null; }, {passive:true});
 let holdFire = null;
 $('fire').addEventListener('pointerdown', e => { e.preventDefault(); audio(); fire(aimNDC); clearInterval(holdFire); holdFire = setInterval(() => fire(aimNDC), 90); });
