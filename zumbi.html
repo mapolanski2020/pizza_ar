@@ -107,6 +107,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .tip b{color:var(--crust)}
 .zoomPill{position:fixed;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:7;background:var(--panel);border:1px solid var(--crust);border-radius:999px;padding:7px 16px;font-weight:800;font-size:15px;pointer-events:none;font-variant-numeric:tabular-nums}
 @media (prefers-reduced-motion:reduce){.guide .phone,.guide .table i,.finger i,.finger::before{animation:none}.guide .phone{transform:rotateX(48deg)}}
+body.cine::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:3;box-shadow:inset 0 9vh 0 #000,inset 0 -9vh 0 #000;animation:cineIn .6s ease}
+@keyframes cineIn{from{box-shadow:inset 0 0 0 #000,inset 0 0 0 #000}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
 .quit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:4;pointer-events:auto}
@@ -685,7 +687,7 @@ function slamFrame(){
     }
   }
 }
-const viewCam = () => (AR === 'xr' && renderer.xr.isPresenting) ? renderer.xr.getCamera() : camera;
+const viewCam = () => cine ? cine.cam : (AR === 'xr' && renderer.xr.isPresenting) ? renderer.xr.getCamera() : camera;
 const HW = 3.2, HD = 2.6, d2 = HD/2, WH = 1.7, RH = 1.15, OV = .34, TAN = RH/d2, ANG = Math.atan(RH/d2);
 const roofY = z => WH + RH - Math.abs(z)*TAN + .08;
 const CHIM = V(.85, 0, -.45);
@@ -794,7 +796,7 @@ function propAt(name, x, z, s, ry = 0, y = 0){
   o.traverse(c => { if(c.isMesh) c.material = toonOf(c.material, false); });
   o.scale.setScalar(s); o.rotation.y = ry; o.position.set(x, y, z); world.add(o); return o;
 }
-const GRAVES = [];
+const GRAVES = [], POSTS = [];
 function buildProps(){
   [[-3, -5.2, .42, .2], [-4.7, -4.1, .4, .5], [-1.6, -6.6, .4, -.1], [1.4, -6.3, .42, .15], [3.2, -5.1, .4, -.3], [4.8, -3.9, .4, -.6]].forEach(([x, z, s, r], i) => { propAt(i%2 ? 'gravestone' : 'grave', x, z, s, r); GRAVES.push(V(x, 0, z + .55)); });
   [[-5.8, -6.2], [0, -7.8], [5.9, -5.9]].forEach(([x, z]) => propAt('marker', x, z, .4, rand(-.4, .4)));
@@ -802,7 +804,7 @@ function buildProps(){
   propAt('pine', -7.6, 2.4, .32, .3); propAt('pineY', 7.7, 2.9, .38, 1.2); propAt('pine', -3.3, -8.3, .27, 2);
   propAt('fence', -3.4, -8.2, .33, 0); propAt('fence', 4.2, -7.9, .33, -.2);
   propAt('pumpkin', -.78, d2 + .5, .22, .4); propAt('pumpkinS', .74, d2 + .5, .26, -.3); propAt('pumpkin', -2.4, 2.6, .28, .9); propAt('pumpkinS', 2.6, 2.1, .3, 2);
-  propAt('postLantern', -1.0, 4.6, .5, Math.PI); propAt('postLantern', 1.0, 4.6, .5, 0);
+  POSTS.push(propAt('postLantern', -1.0, 4.6, .5, Math.PI), propAt('postLantern', 1.0, 4.6, .5, 0));
   propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
 }
 
@@ -885,6 +887,26 @@ function firework(p){
   if(!party) fireworkSnd(p);
 }
 const beep = horn;
+/* ===== Câmera de cinema na vitória: close de frente na família pulando ===== */
+let cine = null;
+const skyTex = canvasTex(4, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#6fbcf0'); gr.addColorStop(.6, '#bfe6f7'); gr.addColorStop(1, '#f6e3c2'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+function startCine(){
+  if(AR === 'xr' || cine) return;   // no WebXR a câmera é o próprio celular
+  const cam = new THREE.PerspectiveCamera(46, innerWidth/innerHeight, .02, 200); world.add(cam);
+  cine = {cam, t:0, bg:scene.background};
+  scene.background = skyTex; document.body.classList.add('cine'); POSTS.forEach(o => o.visible = false); $('hud').hidden = true; $('bQuit').hidden = true;
+}
+function updateCine(dt){
+  const c = cine; c.t += dt; c.cam.aspect = innerWidth/innerHeight; c.cam.updateProjectionMatrix();
+  const half = 1.7, d = clamp(half/(Math.tan(23*Math.PI/180)*Math.min(1, c.cam.aspect)), 3.5, 10);
+  const k = Math.min(1, c.t/2.2), e = 1 - Math.pow(1 - k, 3);   // aproximação suave
+  const dist = d*(1.9 - .9*e), sway = Math.sin(c.t*.6)*.35*e, z0 = d2*HS + 1.4;
+  c.cam.position.set(Math.sin(sway)*dist, .55 + dist*.16, z0 + Math.cos(sway)*dist);
+  c.cam.lookAt(world.localToWorld(V(0, .75, z0)));   // lookAt já considera que a câmera é filha de "world"
+}
+function endCine(){
+  if(!cine) return; world.remove(cine.cam); scene.background = cine.bg; cine = null; POSTS.forEach(o => o.visible = true); document.body.classList.remove('cine');
+}
 function startParty(){
   endParty(); music(null);
   door.rotation.y = 1.5;
@@ -898,6 +920,7 @@ function startParty(){
     return {A, home:V(m.x, 0, d2*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h, voice:['pai', 'mae', 'filho'][i], yell:0};
   });
   party = {t:0, fam, fwT:.2, cfT:0};
+  setTimeout(() => { if(party) startCine(); }, 700);
   if(SAMPLES.familia) setTimeout(() => { if(party) sample('familia', 1, 1, 0, .3); }, 900);
 }
 function updateParty(dt){
@@ -923,6 +946,7 @@ function updateParty(dt){
 
 }
 function endParty(){
+  endCine();
   if(!party) return; engineOn(false);
   if(party.track){ const m = party.track; m.g.gain.setTargetAtTime(0, AC.currentTime, .3); setTimeout(() => { try{ m.s.stop(); }catch(e){} }, 1200); }
   party.fam.forEach(m => world.remove(m.A.g)); party = null;
@@ -1546,7 +1570,8 @@ function loop(time, frame){
     if(Math.random() < dt*1.5 && mode !== 'menu'){ const s = new THREE.Mesh(puffGeo, mat(0xe8e4e0)); s.position.copy(chimneyTop).multiplyScalar(HS); const sz = rand(.1, .16);
       fx(s, 2, (f, k, d) => { s.position.y += d*.6; s.position.x += d*.15; s.scale.setScalar(sz*(1 + k*1.5)*(k > .8 ? (1 - k)*5 : 1)); }); }
   }
-  if(AR === 'xr') renderer.render(scene, camera); else effect.render(scene, camera);
+  if(cine) updateCine(dt);
+  if(AR === 'xr') renderer.render(scene, camera); else effect.render(scene, cine ? cine.cam : camera);
 }
 </script>
 </body>
