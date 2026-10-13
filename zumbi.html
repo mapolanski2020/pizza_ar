@@ -239,6 +239,8 @@ const fmt = n => n.toLocaleString('pt-BR');
 
 /* ================= Regras ================= */
 const GOAL = 5000, LIVES = 5;
+// Atalho de teste: zumbi.html?teste=4900 começa com 4.900 pontos (não vale estrelas nem libera fase)
+const TESTE = clamp(parseInt(new URLSearchParams(location.search).get('teste')) || 0, 0, GOAL - 50);
 const WEAPONS = [
   {name:'Bomba', kills:0, R:1.15, dmg:1, n:1, cd:.42, color:0x26242b, size:.17},
   {name:'Bomba de Pimenta', kills:10, R:1.5, dmg:1, n:1, cd:.4, color:0xd8352a, size:.19},
@@ -887,7 +889,8 @@ function endIntro(){
   [cast.moto, cast.rider.g, cast.res.g].forEach(o => o.parent && o.parent.remove(o));
   door.rotation.y = 0; cast = null;
   $('skip').hidden = true;
-  mode = 'play'; showPlayHUD(true); setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
+  mode = 'play'; showPlayHUD(true);
+  if(TESTE){ G.score = TESTE; G.test = true; renderHUD(); banner('Modo teste', 'Começando com ' + fmt(TESTE) + ' pontos'); } setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
   if(LS.get('ztut') === '1') setTimeout(() => { if(mode === 'play') gestureTip(); }, 900);
   for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
   G.next = 2.5;
@@ -1111,13 +1114,13 @@ function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.
 function showEnd(){
   mode = 'end';
   const won = endWon, stars = won ? (G.lives >= 4 ? 3 : G.lives >= 2 ? 2 : 1) : 0;
-  const P = loadP();
-  if(won){ if(stars > (P.stars[1] || 0)) P.stars[1] = stars; if(!SB && P.unlocked < 2) P.unlocked = 2; }
+  const P = G.test ? {stars:{}, best:{}} : loadP();
+  if(won && !G.test){ if(stars > (P.stars[1] || 0)) P.stars[1] = stars; if(!SB && P.unlocked < 2) P.unlocked = 2; }
   if(G.score > (P.best[1] || 0)) P.best[1] = G.score;
-  saveP(P);
-  let info = '';
-  if(won && SB && LS.get('secret')) SB.rpc('game_level_done', {p_secret:LS.get('secret'), p_level:1}).then(() => {}, () => {});
-  if(won) info = SB ? 'A fase 2 libera quando você registrar o adesivo da sua próxima pizza.' : 'Fase 2 liberada neste celular.';
+  if(!G.test) saveP(P);
+  let info = G.test ? 'Modo teste: este resultado não conta para o cartão fidelidade.' : '';
+  if(won && !G.test && SB && LS.get('secret')) SB.rpc('game_level_done', {p_secret:LS.get('secret'), p_level:1}).then(() => {}, () => {});
+  if(won && !G.test) info = SB ? 'A fase 2 libera quando você registrar o adesivo da sua próxima pizza.' : 'Fase 2 liberada neste celular.';
   $('eTitle').textContent = won ? 'Casa salva!' : 'Os zumbis entraram';
   $('eStars').innerHTML = [0, 1, 2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
   $('eScore').textContent = fmt(G.score);
