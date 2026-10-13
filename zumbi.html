@@ -24,6 +24,8 @@ html,body{margin:0;height:100%;background:var(--oven);color:var(--flour);font-fa
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-offset:2px}
 #ar{position:fixed;inset:0;overflow:hidden}
+#ar video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#ar canvas{position:absolute;inset:0}
 #ar.sky{background:linear-gradient(#7cc4ef 0%,#bfe6f7 55%,#f3e2c3 100%)}
 #touch{position:fixed;inset:0;z-index:2;touch-action:none}
 .top{position:fixed;left:0;right:0;top:0;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:3;pointer-events:none}
@@ -149,7 +151,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
 </div>
 <button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
 <div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa. Depois de aparecer, a casa fica fixa no lugar.</p></div>
-<div class="scan" id="xrHint" hidden><p>Aponte para a mesa ou para a caixa da pizza.<br>Quando aparecer o círculo, toque para colocar a casa.</p></div>
+<div class="scan" id="xrHint" hidden><p id="xrHintTxt">Aponte para a mesa ou para a caixa da pizza.<br>Quando aparecer o círculo, toque para colocar a casa.</p></div>
 <div class="banner" id="banner" aria-live="polite"><b id="bTitle"></b><span id="bSub"></span></div>
 
 <section class="screen" id="start">
@@ -158,13 +160,12 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
     <h1>Zumbis da Pizza</h1>
     <p class="lede">O motoboy entregou a pizza e os zumbis sentiram o cheiro. Defenda a casa!</p>
     <ul class="steps">
-      <li><b>1</b><span>Aponte a câmera para o adesivo: a casa aparece em cima da caixa.</span></li>
+      <li><b>1</b><span>Aponte a câmera para a mesa (ou para a caixa da pizza) e toque para colocar a casa. Ela fica fixa no lugar.</span></li>
       <li><b>2</b><span>Mire com o centro da tela e toque para jogar bombas nos zumbis.</span></li>
       <li><b>3</b><span>Zumbi comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.</span></li>
       <li><b>4</b><span>Cada zumbi que entra na casa tira 1 das 5 vidas. Matando vários, você ganha armas mais fortes.</span></li>
     </ul>
     <div class="load" id="loadBar"><i id="loadFill"></i></div>
-    <button class="btn primary" id="goXR" type="button" hidden>Jogar em AR na mesa</button>
     <button class="btn primary" id="goAR" type="button" disabled>Carregando…</button>
     <button class="btn" id="go3D" type="button" disabled>Jogar sem câmera</button>
     <p class="err" id="startErr" hidden></p>
@@ -307,7 +308,7 @@ function template(key, zombie){
 }
 const ready = Promise.all(FILES.map(f => new Promise((res, rej) => loader.load('zumbi/' + f + '.glb', g => { GL[f] = g; res(); }, undefined, rej))))
   .then(() => { GL.anims.animations.forEach(c => CLIPS[c.name] = c); });
-ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar com o adesivo (AR)'; $('go3D').disabled = false; $('loadBar').hidden = true; })
+ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar em AR (câmera)'; $('go3D').disabled = false; $('loadBar').hidden = true; })
   .catch(e => { console.error(e); $('startErr').textContent = 'Não foi possível carregar o jogo. Verifique a internet e recarregue a página.'; $('startErr').hidden = false; });
 
 /* ================= Personagens ================= */
@@ -351,6 +352,8 @@ let hasGyro = false, seeing = false, xrHit = null, reticle = null;
     eu.set(e.beta*D, e.alpha*D, -e.gamma*D, 'YXZ'); devQ.setFromEuler(eu); devQ.multiply(q1); devQ.multiply(q0.setFromAxisAngle(zee, -o));
   }); }
 async function askGyro(){ try{ if(window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(e){} }
+const PLACE = m => m === 'xr' || m === 'gyro';
+const TABLE = .42;   // modo giroscópio: a mesa fica ~42 cm abaixo do celular
 const viewCam = () => (AR === 'xr' && renderer.xr.isPresenting) ? renderer.xr.getCamera() : camera;
 const HW = 3.2, HD = 2.6, d2 = HD/2, WH = 1.7, RH = 1.15, OV = .34, TAN = RH/d2, ANG = Math.atan(RH/d2);
 const roofY = z => WH + RH - Math.abs(z)*TAN + .08;
@@ -595,7 +598,7 @@ function setupScene(){
 }
 function applyScale(){
   if(!root) return;
-  root.scale.setScalar((AR === 'mind' ? BASE_AR : AR === 'xr' ? BASE_XR : 1)*GS);
+  root.scale.setScalar((AR === 'mind' ? BASE_AR : PLACE(AR) ? BASE_XR : 1)*GS);
   house.scale.setScalar(HS);
   $('oGame').textContent = Math.round(GS*100) + '%'; $('oHouse').textContent = Math.round(HS*100) + '%';
 }
@@ -926,7 +929,7 @@ function endPtr(e){
   if(ptrs.size < 2) pinch0 = null;
   const moved = Math.hypot(p.x - p.x0, p.y - p.y0), quick = performance.now() - p.t < 400;
   if(moved < 10 && quick && !pinch0){
-    if(AR === 'xr' && !tracking){ placeXR(); return; }
+    if(PLACE(AR) && !tracking){ placeXR(); return; }
     if(AR) fire(aimNDC);
     else { setAim3D(e.clientX, e.clientY); fire(aimNDC); }
   }
@@ -942,8 +945,8 @@ addEventListener('keydown', e => { if(e.code === 'Space'){ e.preventDefault(); f
 /* ================= Início ================= */
 async function begin(ar){
   audio(); $('startErr').hidden = true;
-  if(ar === 'mind') askGyro();
-  const btn = ar === 'xr' ? $('goXR') : ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
+  if(ar === 'mind' || ar === 'gyro') askGyro();
+  const btn = ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
   try{
     await ready;
     if(!scene || AR !== ar){
@@ -964,6 +967,19 @@ async function begin(ar){
         session.addEventListener('end', () => location.reload());
         touchEl.addEventListener('beforexrselect', e => e.preventDefault());
         session.addEventListener('select', () => { if(!session.domOverlayState){ if(!tracking) placeXR(); else fire(aimNDC); } });
+      } else if(ar === 'gyro'){
+        // sem WebXR (ex.: iPhone): vídeo da câmera ao fundo + giroscópio; a casa fica numa mesa virtual
+        const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, audio:false});
+        const vid = document.createElement('video'); vid.setAttribute('playsinline', ''); vid.muted = true; vid.srcObject = stream; $('ar').appendChild(vid); await vid.play();
+        renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; $('ar').appendChild(renderer.domElement);
+        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(innerWidth < innerHeight ? 62 : 45, innerWidth/innerHeight, .01, 50);
+        setupScene(); scene.add(root); root.visible = false;
+        reticle = new THREE.Group(); reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+        reticle.add(new THREE.Mesh(new THREE.RingGeometry(.07, .09, 40).rotateX(-Math.PI/2), fxMat(0xffffff, .95)));
+        reticle.add(new THREE.Mesh(new THREE.CircleGeometry(.07, 40).rotateX(-Math.PI/2), fxMat(0x8fd14f, .35)));
+        $('xrHintTxt').innerHTML = 'Aponte o celular para a mesa.<br>Quando aparecer o círculo, toque para colocar a casa.';
+        addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
       } else if(ar){
         const { MindARThree } = await import('mindar-image-three');
         mindar = new MindARThree({container:$('ar'), imageTargetSrc:'targets.mind', uiScanning:'no', uiLoading:'no', uiError:'no', filterMinCF:.0001, filterBeta:.001});
@@ -984,7 +1000,7 @@ async function begin(ar){
       }
       renderer.setAnimationLoop(loop);
     }
-    if(AR === 'xr' && !tracking){ $('xrHint').hidden = false; $('start').hidden = true; $('touch').hidden = false; }
+    if(PLACE(AR) && !tracking){ $('xrHint').hidden = false; $('start').hidden = true; $('touch').hidden = false; }
     else newGame();
     if(AR === 'mind' && !tracking) $('scan').hidden = false;
   }catch(err){
@@ -994,24 +1010,24 @@ async function begin(ar){
   }
   btn.disabled = false; btn.textContent = label;
 }
-$('goAR').addEventListener('click', () => begin('mind'));
-$('goXR').addEventListener('click', () => begin('xr'));
-if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then(ok => { if(ok){ $('goXR').hidden = false; $('goAR').className = 'btn'; ready.then(() => $('goXR').disabled = false); } }, () => {});
+let xrOK = false;
+if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then(ok => { xrOK = ok; }, () => {});
+$('goAR').addEventListener('click', () => begin(new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'gyro')));
 function placeXR(){
   if(!reticle || !reticle.visible) return;
   const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
-  const c = V(); renderer.xr.getCamera().getWorldPosition(c);
+  const c = V(); viewCam().getWorldPosition(c);
   root.position.copy(p); root.rotation.set(0, Math.atan2(c.x - p.x, c.z - p.z), 0); root.visible = true;
   tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false;
   if(!G || mode === 'menu' || mode === 'end') newGame();
 }
 $('bPlace').addEventListener('click', () => {
-  if(AR === 'xr'){ tracking = false; root.visible = false; $('xrHint').hidden = false; }
+  if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; }
   else if(AR === 'mind'){ tracking = false; root.visible = false; $('scan').hidden = false; }
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+window.ZG = {placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
@@ -1024,6 +1040,15 @@ function loop(time, frame){
     if(seeing && anchor.group.visible){ lockM.copy(anchor.group.matrix); qLock.copy(devQ); poseM.copy(lockM); }
     else if(hasGyro){ const rel = devQ.clone().invert().multiply(qLock); poseM.makeRotationFromQuaternion(rel).multiply(lockM); }
     root.updateMatrix(); root.matrix.premultiply(poseM); root.matrixWorldNeedsUpdate = true; root.visible = true;
+  }
+  if(AR === 'gyro'){
+    if(hasGyro) camera.quaternion.copy(devQ);
+    if(!tracking){
+      const dir = V(0, 0, -1).applyQuaternion(camera.quaternion);
+      if(!hasGyro) dir.set(0, -.55, -1).normalize();
+      if(dir.y < -.12){ const k = -TABLE/dir.y; const p = dir.multiplyScalar(Math.min(k, 2.5)); p.y = -TABLE;
+        reticle.matrix.makeTranslation(p.x, p.y, p.z); reticle.visible = true; } else reticle.visible = false;
+    }
   }
   if(AR === 'xr' && frame && xrHit && !tracking){
     const hits = frame.getHitTestResults(xrHit);
