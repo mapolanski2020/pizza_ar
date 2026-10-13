@@ -18,6 +18,8 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
+html.xr,html.xr body{background:transparent!important}
+html.xr #ar{display:none}
 html,body{margin:0;height:100%;background:var(--oven);color:var(--flour);font-family:var(--body);overflow:hidden;-webkit-font-smoothing:antialiased;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-offset:2px}
@@ -36,7 +38,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .hearts svg{width:22px;height:22px;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6))}
 .hearts .on path{fill:var(--ember)}
 .hearts .off path{fill:rgba(20,17,13,.6);stroke:var(--line)}
-.tools{display:flex;gap:6px;pointer-events:auto}
+.tools{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;pointer-events:auto;max-width:58vw}
 .ghost{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 11px;font-size:13px;font-weight:700;min-height:34px}
 .bottom{position:fixed;left:0;right:0;bottom:0;padding:0 14px calc(16px + env(safe-area-inset-bottom,0px));display:flex;justify-content:space-between;align-items:flex-end;gap:10px;z-index:3;pointer-events:none}
 .weapon{padding:8px 12px;display:flex;align-items:center;gap:10px;max-width:62vw}
@@ -130,6 +132,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
     <div class="tools">
       <button class="ghost" id="bSound" type="button" aria-label="Som">Som</button>
       <button class="ghost" id="bSize" type="button">Tamanho</button>
+      <button class="ghost" id="bPlace" type="button" hidden>Reposicionar</button>
       <button class="ghost" id="bQuit" type="button">Sair</button>
     </div>
   </div>
@@ -145,7 +148,8 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
   <button class="btn primary" id="sDone" type="button">Pronto</button>
 </div>
 <button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
-<div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa</p></div>
+<div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa. Depois de aparecer, a casa fica fixa no lugar.</p></div>
+<div class="scan" id="xrHint" hidden><p>Aponte para a mesa ou para a caixa da pizza.<br>Quando aparecer o círculo, toque para colocar a casa.</p></div>
 <div class="banner" id="banner" aria-live="polite"><b id="bTitle"></b><span id="bSub"></span></div>
 
 <section class="screen" id="start">
@@ -160,6 +164,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
       <li><b>4</b><span>Cada zumbi que entra na casa tira 1 das 5 vidas. Matando vários, você ganha armas mais fortes.</span></li>
     </ul>
     <div class="load" id="loadBar"><i id="loadFill"></i></div>
+    <button class="btn primary" id="goXR" type="button" hidden>Jogar em AR na mesa</button>
     <button class="btn primary" id="goAR" type="button" disabled>Carregando…</button>
     <button class="btn" id="go3D" type="button" disabled>Jogar sem câmera</button>
     <p class="err" id="startErr" hidden></p>
@@ -302,7 +307,7 @@ function template(key, zombie){
 }
 const ready = Promise.all(FILES.map(f => new Promise((res, rej) => loader.load('zumbi/' + f + '.glb', g => { GL[f] = g; res(); }, undefined, rej))))
   .then(() => { GL.anims.animations.forEach(c => CLIPS[c.name] = c); });
-ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar com a câmera (AR)'; $('go3D').disabled = false; $('loadBar').hidden = true; })
+ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar com o adesivo (AR)'; $('go3D').disabled = false; $('loadBar').hidden = true; })
   .catch(e => { console.error(e); $('startErr').textContent = 'Não foi possível carregar o jogo. Verifique a internet e recarregue a página.'; $('startErr').hidden = false; });
 
 /* ================= Personagens ================= */
@@ -334,8 +339,19 @@ function turn(obj, target, dt, speed = 10){
 
 /* ================= Cena ================= */
 let renderer, scene, camera, effect, root, world, house, HS = 1, GS = 1, mindar = null, anchor = null;
-let AR = false, tracking = false;
-const BASE_AR = .085;
+let AR = false, tracking = false;   // AR: false | 'mind' (adesivo) | 'xr' (WebXR, fixo na mesa); tracking = jogo posicionado
+const BASE_AR = .085, BASE_XR = .021;
+/* Trava no lugar: o adesivo posiciona uma vez; depois o giroscópio mantém o jogo parado no mundo */
+const poseM = new THREE.Matrix4(), lockM = new THREE.Matrix4(), qLock = new THREE.Quaternion(), devQ = new THREE.Quaternion();
+let hasGyro = false, seeing = false, xrHit = null, reticle = null;
+{ const eu = new THREE.Euler(), q0 = new THREE.Quaternion(), q1 = new THREE.Quaternion(-Math.sqrt(.5), 0, 0, Math.sqrt(.5)), zee = V(0, 0, 1), D = Math.PI/180;
+  addEventListener('deviceorientation', e => {
+    if(e.alpha == null) return; hasGyro = true;
+    const o = ((screen.orientation && screen.orientation.angle) || window.orientation || 0)*D;
+    eu.set(e.beta*D, e.alpha*D, -e.gamma*D, 'YXZ'); devQ.setFromEuler(eu); devQ.multiply(q1); devQ.multiply(q0.setFromAxisAngle(zee, -o));
+  }); }
+async function askGyro(){ try{ if(window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(e){} }
+const viewCam = () => (AR === 'xr' && renderer.xr.isPresenting) ? renderer.xr.getCamera() : camera;
 const HW = 3.2, HD = 2.6, d2 = HD/2, WH = 1.7, RH = 1.15, OV = .34, TAN = RH/d2, ANG = Math.atan(RH/d2);
 const roofY = z => WH + RH - Math.abs(z)*TAN + .08;
 const CHIM = V(.85, 0, -.45);
@@ -553,7 +569,7 @@ function banner(title, sub, cls){
 }
 const tmpV = V();
 function popup(text, local, cls){
-  tmpV.copy(local); world.localToWorld(tmpV); tmpV.project(camera);
+  tmpV.copy(local); world.localToWorld(tmpV); tmpV.project(viewCam());
   if(tmpV.z > 1) return;
   const el = document.createElement('div'); el.className = 'pop' + (cls ? ' ' + cls : ''); el.textContent = text;
   el.style.left = ((tmpV.x + 1)/2*innerWidth) + 'px'; el.style.top = ((1 - tmpV.y)/2*innerHeight) + 'px';
@@ -579,7 +595,7 @@ function setupScene(){
 }
 function applyScale(){
   if(!root) return;
-  root.scale.setScalar((AR ? BASE_AR : 1)*GS);
+  root.scale.setScalar((AR === 'mind' ? BASE_AR : AR === 'xr' ? BASE_XR : 1)*GS);
   house.scale.setScalar(HS);
   $('oGame').textContent = Math.round(GS*100) + '%'; $('oHouse').textContent = Math.round(HS*100) + '%';
 }
@@ -778,9 +794,9 @@ function makeBomb(w){
   const s = new THREE.Mesh(sphereGeo, sparkMat); s.scale.setScalar(.28); s.position.set(-.2, 1.45, 0); g.add(s); g.userData.spark = s;
   g.scale.setScalar(w.size); return g;
 }
-function camLocal(){ const p = V(); camera.getWorldPosition(p); return world.worldToLocal(p); }
+function camLocal(){ const p = V(); viewCam().getWorldPosition(p); return world.worldToLocal(p); }
 function aimAt(ndc){
-  RAY.setFromCamera(ndc, camera);
+  RAY.setFromCamera(ndc, viewCam());
   const hits = RAY.intersectObjects(RAYS, false);
   if(hits.length){ const h = hits[0]; const p = world.worldToLocal(h.point.clone()); const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : V(0, 1, 0); return {p, n, ground:!!h.object.userData.ground}; }
   // fora do chão: usa o plano do chão
@@ -889,7 +905,7 @@ function cleanupEnd(){ if(G && G.hero){ world.remove(G.hero.g); G.hero = null; }
 $('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
 $('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
 $('bQuit').addEventListener('click', () => { if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
-  ['hud', 'hudB', 'cross', 'touch', 'scan', 'end', 'skip', 'sizer'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
+  ['hud', 'hudB', 'cross', 'touch', 'scan', 'xrHint', 'end', 'skip', 'sizer'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
 
 /* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
 const touchEl = $('touch'), ptrs = new Map();
@@ -910,6 +926,7 @@ function endPtr(e){
   if(ptrs.size < 2) pinch0 = null;
   const moved = Math.hypot(p.x - p.x0, p.y - p.y0), quick = performance.now() - p.t < 400;
   if(moved < 10 && quick && !pinch0){
+    if(AR === 'xr' && !tracking){ placeXR(); return; }
     if(AR) fire(aimNDC);
     else { setAim3D(e.clientX, e.clientY); fire(aimNDC); }
   }
@@ -925,21 +942,37 @@ addEventListener('keydown', e => { if(e.code === 'Space'){ e.preventDefault(); f
 /* ================= Início ================= */
 async function begin(ar){
   audio(); $('startErr').hidden = true;
-  const btn = ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
+  if(ar === 'mind') askGyro();
+  const btn = ar === 'xr' ? $('goXR') : ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
   try{
     await ready;
     if(!scene || AR !== ar){
       if(scene){ location.reload(); return; }
       AR = ar;
-      if(ar){
+      if(ar === 'xr'){
+        renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+        renderer.outputEncoding = THREE.sRGBEncoding; renderer.xr.enabled = true; $('ar').appendChild(renderer.domElement);
+        scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, .01, 50);
+        setupScene(); scene.add(root); root.visible = false;
+        reticle = new THREE.Group(); reticle.matrixAutoUpdate = false; reticle.visible = false; scene.add(reticle);
+        const rr = new THREE.Mesh(new THREE.RingGeometry(.07, .09, 40).rotateX(-Math.PI/2), fxMat(0xffffff, .95)); reticle.add(rr);
+        const rd = new THREE.Mesh(new THREE.CircleGeometry(.07, 40).rotateX(-Math.PI/2), fxMat(0x8fd14f, .35)); reticle.add(rd);
+        document.documentElement.classList.add('xr');
+        const session = await navigator.xr.requestSession('immersive-ar', {requiredFeatures:['hit-test'], optionalFeatures:['dom-overlay'], domOverlay:{root:document.body}});
+        renderer.xr.setReferenceSpaceType('local'); await renderer.xr.setSession(session);
+        const vs = await session.requestReferenceSpace('viewer'); xrHit = await session.requestHitTestSource({space:vs});
+        session.addEventListener('end', () => location.reload());
+        touchEl.addEventListener('beforexrselect', e => e.preventDefault());
+        session.addEventListener('select', () => { if(!session.domOverlayState){ if(!tracking) placeXR(); else fire(aimNDC); } });
+      } else if(ar){
         const { MindARThree } = await import('mindar-image-three');
         mindar = new MindARThree({container:$('ar'), imageTargetSrc:'targets.mind', uiScanning:'no', uiLoading:'no', uiError:'no', filterMinCF:.0001, filterBeta:.001});
         ({renderer, scene, camera} = mindar);
         renderer.outputEncoding = THREE.sRGBEncoding;
         anchor = mindar.addAnchor(0);
-        anchor.onTargetFound = () => { tracking = true; $('scan').hidden = true; };
-        anchor.onTargetLost = () => { tracking = false; if(mode !== 'menu' && mode !== 'end') $('scan').hidden = false; };
-        setupScene(); root.rotation.x = Math.PI/2; anchor.group.add(root);
+        anchor.onTargetFound = () => { seeing = true; if(!tracking){ tracking = true; $('scan').hidden = true; $('bPlace').hidden = false; } };
+        anchor.onTargetLost = () => { seeing = false; };
+        setupScene(); root.rotation.x = Math.PI/2; scene.add(root); root.matrixAutoUpdate = false; root.visible = false;
         await mindar.start();
       } else {
         $('ar').classList.add('sky');
@@ -951,8 +984,9 @@ async function begin(ar){
       }
       renderer.setAnimationLoop(loop);
     }
-    newGame();
-    if(AR && !tracking) $('scan').hidden = false;
+    if(AR === 'xr' && !tracking){ $('xrHint').hidden = false; $('start').hidden = true; $('touch').hidden = false; }
+    else newGame();
+    if(AR === 'mind' && !tracking) $('scan').hidden = false;
   }catch(err){
     console.error(err);
     $('startErr').textContent = ar ? 'Não foi possível abrir a câmera. Verifique a permissão da câmera e se a página está em https. Você pode jogar sem câmera.' : 'Não foi possível montar o jogo neste aparelho.';
@@ -960,17 +994,42 @@ async function begin(ar){
   }
   btn.disabled = false; btn.textContent = label;
 }
-$('goAR').addEventListener('click', () => begin(true));
+$('goAR').addEventListener('click', () => begin('mind'));
+$('goXR').addEventListener('click', () => begin('xr'));
+if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then(ok => { if(ok){ $('goXR').hidden = false; $('goAR').className = 'btn'; ready.then(() => $('goXR').disabled = false); } }, () => {});
+function placeXR(){
+  if(!reticle || !reticle.visible) return;
+  const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
+  const c = V(); renderer.xr.getCamera().getWorldPosition(c);
+  root.position.copy(p); root.rotation.set(0, Math.atan2(c.x - p.x, c.z - p.z), 0); root.visible = true;
+  tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false;
+  if(!G || mode === 'menu' || mode === 'end') newGame();
+}
+$('bPlace').addEventListener('click', () => {
+  if(AR === 'xr'){ tracking = false; root.visible = false; $('xrHint').hidden = false; }
+  else if(AR === 'mind'){ tracking = false; root.visible = false; $('scan').hidden = false; }
+});
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {FX, camTarget:null, get tracking(){ return tracking; }, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+window.ZG = {FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
 const DTMAX = Math.min(.25, +new URLSearchParams(location.search).get('dtmax') || .05);
 const camTarget = V(0, .2, 1.2); window.ZG.camTarget = camTarget;
-function loop(){
+function loop(time, frame){
   const now = performance.now(), dt = Math.min(DTMAX, (now - last)/1000); last = now;
+  if(AR === 'mind' && tracking){
+    // adesivo visível: atualiza a trava; fora de vista: gira o jogo ao contrário do celular (giroscópio)
+    if(seeing && anchor.group.visible){ lockM.copy(anchor.group.matrix); qLock.copy(devQ); poseM.copy(lockM); }
+    else if(hasGyro){ const rel = devQ.clone().invert().multiply(qLock); poseM.makeRotationFromQuaternion(rel).multiply(lockM); }
+    root.updateMatrix(); root.matrix.premultiply(poseM); root.matrixWorldNeedsUpdate = true; root.visible = true;
+  }
+  if(AR === 'xr' && frame && xrHit && !tracking){
+    const hits = frame.getHitTestResults(xrHit);
+    if(hits.length){ const pose = hits[0].getPose(renderer.xr.getReferenceSpace()); reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
+    else reticle.visible = false;
+  }
   const paused = AR && !tracking;
   if(!AR){
     const r = orbit.dist; camera.position.set(Math.sin(orbit.az)*Math.cos(orbit.el)*r, Math.sin(orbit.el)*r, Math.cos(orbit.az)*Math.cos(orbit.el)*r);
@@ -1003,7 +1062,7 @@ function loop(){
     if(Math.random() < dt*1.5 && mode !== 'menu'){ const s = new THREE.Mesh(puffGeo, mat(0xe8e4e0)); s.position.copy(chimneyTop).multiplyScalar(HS); const sz = rand(.1, .16);
       fx(s, 2, (f, k, d) => { s.position.y += d*.6; s.position.x += d*.15; s.scale.setScalar(sz*(1 + k*1.5)*(k > .8 ? (1 - k)*5 : 1)); }); }
   }
-  effect.render(scene, camera);
+  if(AR === 'xr') renderer.render(scene, camera); else effect.render(scene, camera);
 }
 </script>
 </body>
