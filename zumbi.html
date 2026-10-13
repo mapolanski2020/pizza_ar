@@ -231,6 +231,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
       <button class="btn" id="eMenu" type="button">Fases</button>
       <button class="btn primary" id="eAgain" type="button">Jogar de novo</button>
     </div>
+    <button class="btn primary" id="eCont" type="button" hidden>Continuar até 10.000</button>
   </div>
 </section>
 
@@ -252,7 +253,8 @@ const fmt = n => n.toLocaleString('pt-BR');
 /* ================= Regras ================= */
 const GOAL = 5000, LIVES = 5;
 // Atalho de teste: zumbi.html?teste=4900 começa com 4.900 pontos (não vale estrelas nem libera fase)
-const TESTE = clamp(parseInt(new URLSearchParams(location.search).get('teste')) || 0, 0, GOAL - 50);
+const GOAL2 = 10000;
+const TESTE = clamp(parseInt(new URLSearchParams(location.search).get('teste')) || 0, 0, GOAL2 - 50);
 const WEAPONS = [
   {name:'Bomba', snd:'bomba1', kills:0, R:1.15, dmg:1, n:1, cd:.42, color:0x26242b, size:.17},
   {name:'Bomba de Pimenta', snd:'bomba2', kills:10, R:1.5, dmg:1, n:1, cd:.4, color:0xd8352a, size:.19},
@@ -279,6 +281,8 @@ const PKEY = 'monte-a-pizza-ar-v1';
 function loadP(){ let P = {unlocked:1, stars:{}, best:{}}; try{ P = Object.assign(P, JSON.parse(localStorage.getItem(PKEY)) || {}); }catch(e){} return P; }
 function saveP(P){ try{ localStorage.setItem(PKEY, JSON.stringify(P)); }catch(e){} }
 { const b = loadP().best[1]; if(b) $('bestNote').textContent = 'Seu recorde: ' + fmt(b) + ' pontos.'; }
+let OWNER = !SB;
+if(SB && LS.get('secret')) SB.rpc('game_progress', {p_secret:LS.get('secret')}).then(r => { if(r.data && r.data.ok) OWNER = true; }, () => {});
 
 /* ================= Som (sintetizado) ================= */
 let AC = null, muted = LS.get('zmute') === '1';
@@ -887,9 +891,8 @@ function buildProps(){
   propAt('deadTree', -6.9, -2.6, .42, .4); propAt('deadTreeM', 6.9, -1.8, .45, 2); propAt('deadTree', 2.6, -7.9, .38, 1);
   propAt('pine', -7.6, 2.4, .32, .3); propAt('pineY', 7.7, 2.9, .38, 1.2); propAt('pine', -3.3, -8.3, .27, 2);
   propAt('fence', -3.4, -8.2, .33, 0); propAt('fence', 4.2, -7.9, .33, -.2);
-  propAt('pumpkin', -.78, d2 + .5, .22, .4); propAt('pumpkinS', .74, d2 + .5, .26, -.3);
-  [[-1.5, d2 + .8, .4], [1.5, d2 + .8, .38], [-1.6, d2 + 2.15, .44], [1.6, d2 + 2.15, .42], [-1.5, d2 + 3.4, .36], [1.5, d2 + 3.4, .38], [-2.45, d2 + 1.45, .32], [2.45, d2 + 1.45, .34]]
-    .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); glowAt(o, sc); }); propAt('pumpkin', -2.4, 2.6, .28, .9); propAt('pumpkinS', 2.6, 2.1, .3, 2);
+  [[-1.5, d2 + .8, .4], [1.5, d2 + .8, .38], [-1.6, d2 + 2.4, .44], [1.6, d2 + 2.4, .42]]
+    .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); glowAt(o, sc); });
   POSTS.push(propAt('postLantern', -1.0, 4.6, .5, Math.PI), propAt('postLantern', 1.0, 4.6, .5, 0));
   propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
 }
@@ -1055,7 +1058,7 @@ const STAR = '<path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.6l1.
 const hex = c => '#' + c.toString(16).padStart(6, '0');
 function renderHUD(){
   if(!G) return;
-  $('hScore').textContent = fmt(G.score); $('hBar').style.width = Math.min(100, G.score/GOAL*100) + '%';
+  $('hScore').textContent = fmt(G.score); $('hBar').style.width = Math.min(100, G.score/G.goal*100) + '%';
   $('hLives').innerHTML = Array.from({length:LIVES}, (_, i) => '<svg viewBox="0 0 24 24" class="' + (i < G.lives ? 'on' : 'off') + '" aria-hidden="true">' + HEART + '</svg>').join('');
   $('hLives').setAttribute('aria-label', G.lives + ' de ' + LIVES + ' vidas');
   const w = WEAPONS[G.w], nx = WEAPONS[G.w + 1];
@@ -1201,7 +1204,7 @@ function endIntro(){
   door.rotation.y = 0; cast = null;
   $('skip').hidden = true;
   mode = 'play'; showPlayHUD(true); music('game');
-  if(TESTE){ G.score = TESTE; G.test = true; renderHUD(); banner('Modo teste', 'Começando com ' + fmt(TESTE) + ' pontos'); } setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
+  if(TESTE){ G.score = TESTE; G.test = true; if(TESTE >= GOAL){ G.goal = GOAL2; G.first = true; } renderHUD(); banner('Modo teste', 'Começando com ' + fmt(TESTE) + ' pontos'); } setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
   if(LS.get('ztut') === '1') setTimeout(() => { if(mode === 'play') gestureTip(); }, 900);
   for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
   G.next = 2.5;
@@ -1215,7 +1218,8 @@ function spawn(typeKey, fromGrave){
   let pos;
   if(fromGrave || (!T.climb && Math.random() < .35)){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
   else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
-  const Z = {T, typeKey, A, hp:T.hp, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0};
+  const extra = G ? clamp((G.score - GOAL)/(GOAL2 - GOAL), 0, 1) : 0;
+  const Z = {T, typeKey, A, hp:T.hp + (T.strong && extra > .5 ? 1 : 0), spd:1 + .55*extra, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0};
   const ang = Math.atan2(pos.z, pos.x);
   if(T.climb){
     const s = pos.z >= 0 ? 1 : -1, x = clamp(pos.x*.22, -1.1, 1.1);
@@ -1260,7 +1264,7 @@ function updateZombie(Z, dt){
   if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); } return; }
   if(Z.state === 'move'){
     const seg = Z.segs[Z.si], B = seg.to(), p = Z.pos;
-    const dv = B.clone().sub(p), dist = dv.length(), step = seg.sp*dt*(A.bones && !seg.climb && !seg.hop ? .45 + .9*Math.abs(Math.sin(Z.t*2.4 + A.ph)) : 1);
+    const dv = B.clone().sub(p), dist = dv.length(), step = (Z.spd || 1)*seg.sp*dt*(A.bones && !seg.climb && !seg.hop ? .45 + .9*Math.abs(Math.sin(Z.t*2.4 + A.ph)) : 1);
     if(T.blink && Z.si === 0 && dist > 2.5){ Z.blinkT -= dt; if(Z.blinkT <= 0){ Z.blinkT = rand(2.5, 4); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); p.addScaledVector(dv, Math.min(.6, 1.6/dist)); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); } }
     if(dist <= step){ p.copy(B); Z.si++; if(Z.si >= Z.segs.length){ arrive(Z); return; } Z.segStart = p.clone(); startSeg(Z); }
     else p.addScaledVector(dv, step/dist);
@@ -1329,7 +1333,7 @@ function kill(Z){
   const nx = WEAPONS[G.w + 1];
   if(nx && G.kills >= nx.kills){ G.w++; levelUp(); showWeapon(); banner('Nova arma: ' + nx.name + '!', 'Explosão ' + (nx.n > 1 ? 'com ' + nx.n + ' bombas' : 'maior'), ''); }
   renderHUD();
-  if(G.score >= GOAL) gameOver(true);
+  if(G.score >= G.goal) gameOver(true);
 }
 
 /* ===== Bombas ===== */
@@ -1386,25 +1390,26 @@ function explode(p, w){
 
 /* ===== Diretor de ondas ===== */
 function pickType(){
-  const opts = Object.entries(TYPES).filter(([k, T]) => G.score >= T.from), sum = opts.reduce((a, [, T]) => a + T.w, 0);
-  let r = Math.random()*sum; for(const [k, T] of opts){ r -= T.w; if(r <= 0) return k; } return 'zumbi';
+  const extra = clamp((G.score - GOAL)/(GOAL2 - GOAL), 0, 1), wt = T => T.w*(T.strong ? 1 + 2.5*extra : 1);   // depois de 5.000, mais zumbis fortes
+  const opts = Object.entries(TYPES).filter(([k, T]) => G.score >= T.from), sum = opts.reduce((a, [, T]) => a + wt(T), 0);
+  let r = Math.random()*sum; for(const [k, T] of opts){ r -= wt(T); if(r <= 0) return k; } return 'zumbi';
 }
 function director(dt){
-  const ramp = Math.min(1, G.score/GOAL), alive = ZS.filter(z => z.state !== 'dead').length;
+  const ramp = Math.min(1, G.score/GOAL), extra = clamp((G.score - GOAL)/(GOAL2 - GOAL), 0, 1), alive = ZS.filter(z => z.state !== 'dead').length;
   for(const [k, T] of Object.entries(TYPES)){ if(T.from > 0 && G.score >= T.from && !G.seen[k]){ G.seen[k] = true; banner('Cuidado!', 'Chegaram os ' + T.label.toLowerCase(), 'slime'); spawn(k); } }
   G.next -= dt; G.horde -= dt;
   G.gT = (G.gT == null ? 2 : G.gT) - dt;   // a horda geme de vez em quando
   if(G.gT <= 0){ G.gT = rand(1.4, 3.2); const w = ZS.filter(z => z.state === 'move' || z.state === 'break'); if(w.length){ const z = pick(w); groan(z.pos, 'groan', z.T); } }
-  const interval = 2.5 - 1.75*ramp, maxAlive = 4 + Math.round(10*ramp);
+  const interval = Math.max(.38, 2.5 - 1.75*ramp - .4*extra), maxAlive = 4 + Math.round(10*ramp + 9*extra);
   if(G.next <= 0 && alive < maxAlive){ spawn(pickType()); G.next = interval*rand(.6, 1.3); }
-  if(G.horde <= 0){ G.horde = rand(34, 44); const n = 3 + Math.round(ramp*5); banner('Horda de zumbis!', n + ' zumbis ao mesmo tempo', 'slime'); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
+  if(G.horde <= 0){ G.horde = rand(34, 44) - 14*extra; const n = 3 + Math.round(ramp*5 + extra*7); banner('Horda de zumbis!', n + ' zumbis ao mesmo tempo', 'slime'); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
 }
 
 /* ===== Fluxo ===== */
 function newGame(){
   ZS.slice().forEach(removeZ); BOMBS.forEach(b => world.remove(b.m)); BOMBS.length = 0;
   FX.forEach(f => world.remove(f.mesh)); FX.length = 0;
-  G = {score:0, lives:LIVES, kills:0, strong:0, lost:0, w:0, t:0, next:3, horde:38, seen:{}, paused:false};
+  G = {goal:GOAL, score:0, lives:LIVES, kills:0, strong:0, lost:0, w:0, t:0, next:3, horde:38, seen:{}, paused:false};
   door.rotation.y = 0;
   $('end').hidden = true; $('start').hidden = true; $('touch').hidden = false;
   mode = 'intro'; renderHUD(); showPlayHUD(false);
@@ -1419,7 +1424,7 @@ function gameOver(won){
   if(mode !== 'play') return;
   mode = 'ending'; endWon = won; endT = won ? 8.5 : 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
   if(won){
-    banner('VITÓRIA!', 'Casa salva! A família vai comer a pizza', 'win');
+    banner(G.goal >= GOAL2 ? 'LENDA DA PIZZA!' : 'VITÓRIA!', G.goal >= GOAL2 ? '10.000 pontos! Ninguém segura essa família' : 'Casa salva! A família vai comer a pizza', 'win');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
     boom(true, null, 'dinamite'); startParty();
   } else {
@@ -1433,18 +1438,24 @@ function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.
 function showEnd(){
   mode = 'end';
   const won = endWon, stars = won ? (G.lives >= 4 ? 3 : G.lives >= 2 ? 2 : 1) : 0;
+  const first = won && G.goal === GOAL;   // primeira vitória (5.000)
   const P = G.test ? {stars:{}, best:{}} : loadP();
-  if(won && !G.test){ if(stars > (P.stars[1] || 0)) P.stars[1] = stars; if(!SB && P.unlocked < 2) P.unlocked = 2; }
+  if(won && first && !G.test){ if(stars > (P.stars[1] || 0)) P.stars[1] = stars; if(!SB && P.unlocked < 2) P.unlocked = 2; }
   if(G.score > (P.best[1] || 0)) P.best[1] = G.score;
   if(!G.test) saveP(P);
   let info = G.test ? 'Modo teste: este resultado não conta para o cartão fidelidade.' : '';
-  if(won && !G.test && SB && LS.get('secret')) SB.rpc('game_level_done', {p_secret:LS.get('secret'), p_level:1}).then(() => {}, () => {});
-  if(won && !G.test) info = SB ? 'A fase 2 libera quando você registrar o adesivo da sua próxima pizza.' : 'Fase 2 liberada neste celular.';
-  $('eTitle').textContent = won ? 'Casa salva!' : 'Os zumbis entraram';
+  if(won && first && !G.test && SB && LS.get('secret')) SB.rpc('game_level_done', {p_secret:LS.get('secret'), p_level:1}).then(() => {}, () => {});
+  let canGo = false;
+  if(first){
+    if(OWNER){ canGo = true; info = (G.test ? 'Modo teste. ' : '') + 'Você ganhou 1 ponto de fidelidade! Quer continuar até 10.000? Fica cada vez mais difícil.'; }
+    else info = 'Este adesivo já foi registrado por outro celular, então aqui o jogo vai só até 5.000. Peça uma pizza e registre o adesivo com o seu celular para ganhar pontos e jogar até 10.000.';
+  } else if(won) info = 'Você chegou a 10.000 pontos. É a lenda da pizza!';
+  $('eCont').hidden = !canGo;
+  $('eTitle').textContent = won ? (G.goal >= GOAL2 ? 'Lenda da pizza!' : 'Casa salva!') : 'Os zumbis entraram';
   $('eStars').innerHTML = [0, 1, 2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
   $('eScore').textContent = fmt(G.score);
   const lines = [['Zumbis derrotados', String(G.kills)], ['Zumbis fortes (100 pts)', String(G.strong)], ['Vidas restantes', G.lives + ' de ' + LIVES], ['Melhor arma', WEAPONS[G.w].name]];
-  if(!won) lines.unshift(['Faltaram', fmt(Math.max(0, GOAL - G.score)) + ' pontos']);
+  if(!won) lines.unshift(['Faltaram', fmt(Math.max(0, G.goal - G.score)) + ' pontos']);
   $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
   $('eInfo').hidden = !info; $('eInfo').textContent = info; $('eInfo').className = 'info ' + (won ? 'good' : '');
   $('end').classList.toggle('won', won);
@@ -1452,6 +1463,13 @@ function showEnd(){
 }
 function cleanupEnd(){ endParty(); music(null); door.rotation.y = 0; }
 $('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
+$('eCont').addEventListener('click', () => {
+  cleanupEnd(); ZS.slice().forEach(removeZ);
+  G.goal = GOAL2; G.next = 1.5; G.horde = 25;
+  $('end').hidden = true; $('touch').hidden = false; $('hud').hidden = false; $('bQuit').hidden = false;
+  mode = 'play'; showPlayHUD(true); music('game'); renderHUD();
+  banner('Rumo aos 10.000!', 'Os zumbis estão mais rápidos e mais fortes', 'slime');
+});
 $('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
 $('bQuit').addEventListener('click', () => { tutOff(); music(null); if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
   ['hud', 'hudB', 'cross', 'touch', 'scan', 'xrHint', 'end', 'skip', 'sizer', 'bQuit'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
