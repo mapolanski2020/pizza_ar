@@ -385,7 +385,7 @@ function setupScene(){
 
 /* ================= Início ================= */
 $('go').addEventListener('click', async () => {
-  if(LEVELS[selLevel - 1].zombie){ location.href = 'zumbi.html'; return; }
+  if(LEVELS[selLevel - 1].zombie){ location.href = 'zumbi.html' + (TOKEN ? '?s=' + TOKEN : ''); return; }
   $('go').disabled = true; $('go').textContent = 'Abrindo a câmera…'; $('startErr').hidden = true;
   try{
     await modelsReady;
