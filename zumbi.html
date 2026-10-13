@@ -305,7 +305,7 @@ function bus(){
   loadSamples();
 }
 const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4'];
-function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => AC.decodeAudioData(b, res, rej))).then(buf => SAMPLES[n] = buf).catch(() => {})); }
+function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => { const pr = AC.decodeAudioData(b, res, rej); if(pr && pr.catch) pr.catch(() => {}); })).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
   if(p){ p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(OUT); if(wet){ const w = AC.createGain(); w.gain.value = wet; p.connect(w).connect(REV); } }
