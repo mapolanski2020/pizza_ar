@@ -900,10 +900,10 @@ function updateParty(dt){
     const A = m.A; A.mixer.update(dt);
     if(t < m.out) return;
     A.g.visible = true;
-    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = .1 + i*.6; } return; }
+    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = rand(.1, 1.4); m.yells = 0; } return; }
     // "Ehhhhh!": grita e dá um pulão de alegria
     m.yell -= dt;
-    if(m.yell <= 0 && !m.yelled){ m.yelled = true; m.big = .9; cheerVoice(m.voice, A.g.position); popup('Ehhhhh!', V(A.g.position.x, m.h + .7, A.g.position.z), 'yay'); }
+    if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(2, 4.5); m.big = .9; cheerVoice(m.voice, A.g.position); }
     if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.9; A.play('Jump_Full_Short', {ts:1.1}); A.g.position.y = Math.sin(q*Math.PI)*1.05*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.5)); A.g.rotation.y = 0; if(A.box) A.box.rotation.y += dt*8; return; }
     // pula e comemora sem parar, cada um no seu ritmo
     const k = (t*1.6 + m.ph) % 2;
