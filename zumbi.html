@@ -308,7 +308,7 @@ function bus(){
   MUS = AC.createGain(); MUS.gain.value = .55; MUS.connect(OUT);
   loadSamples();
 }
-const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4', 'dinamite'];
+const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4', 'dinamite', 'pai', 'mae', 'filho', 'familia', 'musica_vitoria'];
 function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => { const pr = AC.decodeAudioData(b, res, rej); if(pr && pr.catch) pr.catch(() => {}); })).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
@@ -421,7 +421,8 @@ function ding(){
 /* "Ehhhhh!" dos moradores: voz com formantes da vogal "é", tom subindo de alegria */
 const VOZ = {pai:{f0:135, f:[560, 1720, 2450]}, mae:{f0:240, f:[620, 2050, 2900]}, filho:{f0:330, f:[680, 2250, 3200]}};
 function cheerVoice(who, p){
-  if(!ok()) return; const v = VOZ[who] || VOZ.pai, t = AC.currentTime + rand(0, .06), dur = rand(1.05, 1.35), pan = panOf(p);
+  if(!ok()) return;
+  if(SAMPLES[who]){ sample(who, 1, rand(.97, 1.03), panOf(p), .3); return; }   // voz gravada do morador const v = VOZ[who] || VOZ.pai, t = AC.currentTime + rand(0, .06), dur = rand(1.05, 1.35), pan = panOf(p);
   const src = AC.createOscillator(); src.type = 'sawtooth';
   src.frequency.setValueAtTime(v.f0*.9, t); src.frequency.exponentialRampToValueAtTime(v.f0*1.35, t + .28);
   src.frequency.setValueAtTime(v.f0*1.35, t + dur*.6); src.frequency.exponentialRampToValueAtTime(v.f0*1.1, t + dur);
@@ -874,7 +875,9 @@ function startParty(){
   const moto = scooter(); moto.rotation.y = Math.PI/2; moto.position.set(-8, 0, 5.85); world.add(moto);
   const rider = actor('Knight', 1.05, false); moto.add(rider.g); rider.g.position.set(0, .28, -.18); rider.shadow.visible = false; rider.play('Sit_Chair_Idle');
   party = {t:0, fam, fwT:.2, cfT:0, moto, rider, beeped:false};
-  fanfare(); setTimeout(() => { if(party) music('party'); }, 1300);
+  fanfare();
+  if(SAMPLES.familia) setTimeout(() => { if(party) sample('familia', 1, 1, 0, .3); }, 900);
+  setTimeout(() => { if(!party) return; if(SAMPLES.musica_vitoria){ const m = sample('musica_vitoria', .8, 1, 0, .15); if(m){ m.s.loop = true; party.track = m; } } else music('party'); }, 1300);
 }
 function updateParty(dt){
   const P = party; P.t += dt; const t = P.t;
@@ -902,6 +905,7 @@ function updateParty(dt){
 }
 function endParty(){
   if(!party) return; engineOn(false);
+  if(party.track){ const m = party.track; m.g.gain.setTargetAtTime(0, AC.currentTime, .3); setTimeout(() => { try{ m.s.stop(); }catch(e){} }, 1200); }
   party.fam.forEach(m => world.remove(m.A.g)); world.remove(party.moto); party = null;
 }
 function confetti(p){
