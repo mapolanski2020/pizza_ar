@@ -253,8 +253,8 @@ const WEAPONS = [
   {name:'Chuva de Bombas', snd:'bomba4', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
 ];
 const TYPES = {
-  zumbi:{label:'Zumbi', models:['Rogue','Rogue_Hooded','Mage'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.9, from:0, w:5},
-  escalador:{label:'Zumbis escaladores', models:['Rogue_Hooded','Rogue'], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
+  zumbi:{label:'Zumbi', models:['Rogue','Mage','Barbarian','Knight'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.9, from:0, w:5},
+  escalador:{label:'Zumbis escaladores', models:['Rogue','Barbarian'], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
   esqueleto:{label:'Esqueletos corredores', models:['anims'], hp:1, pts:50, speed:1.15, h:1, walk:'Running_A', ts:.85, from:700, w:3, death:'Death_C_Skeletons'},
   guerreiro:{label:'Esqueletos guerreiros', models:['Skeleton_Warrior'], hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', from:1500, w:2.2, death:'Death_C_Skeletons'},
   ninja:{label:'Esqueletos ninja (sobem no telhado)', models:['Skeleton_Rogue'], hp:2, pts:100, strong:true, speed:1, h:1, walk:'Running_A', climb:true, from:2300, w:1.6, death:'Death_C_Skeletons'},
@@ -525,12 +525,13 @@ const KEEP = /Body|Arm|Leg|Head|Hat|Helmet|Cape|Cloak|Eyes|Jaw|Skull|Hood/;
 const TPL = {};
 const CLIPS = {};
 const PROPS = ['pumpkin', 'pumpkinS', 'grave', 'gravestone', 'deadTree', 'deadTreeM', 'lantern', 'postLantern', 'fence', 'pine', 'pineY', 'marker'];
-function template(key, zombie){
-  const k = key + (zombie ? '_z' : '');
+function template(key, zombie, bare){
+  const k = key + (zombie ? '_z' : '') + (bare ? '_b' : '');
   if(TPL[k]) return TPL[k];
   const s = skClone(GL[key].scene);
   s.traverse(o => { if(o.isMesh){
-    if(!KEEP.test(o.name) || (zombie && /Helmet/.test(o.name))) o.visible = false;
+    // inimigos ficam sem chapéu, capuz ou capacete: aparece a cabeça de zumbi / caveira
+    if(!KEEP.test(o.name) || ((zombie || bare) && /Hat|Helmet|Hood(?!ed)/.test(o.name))) o.visible = false;
     o.material = toonOf(o.material, zombie); o.frustumCulled = false;
   } });
   const b = new THREE.Box3(); s.traverse(o => { if(o.isMesh && o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
@@ -545,8 +546,8 @@ ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar em
 const blobGeo = new THREE.CircleGeometry(.36, 20).rotateX(-Math.PI/2);
 const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.28, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
 blobMat.userData.outlineParameters = {visible:false};
-function actor(key, h, zombie){
-  const T = template(key, zombie), m = skClone(T.scene);
+function actor(key, h, zombie, bare){
+  const T = template(key, zombie, bare), m = skClone(T.scene);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
   const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .06; sh.scale.setScalar(h); g.add(sh);
@@ -1081,7 +1082,7 @@ $('skip').addEventListener('click', () => { if(cast){ if(!cast.smell) banner('Os
 /* ===== Zumbis ===== */
 function spawn(typeKey, fromGrave){
   const T = TYPES[typeKey]; const key = pick(T.models);
-  const A = actor(key, T.h, !!T.zombie);
+  const A = actor(key, T.h, !!T.zombie, true);
   let pos;
   if(fromGrave || (!T.climb && Math.random() < .35)){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
   else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
