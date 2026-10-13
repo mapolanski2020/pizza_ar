@@ -26,6 +26,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 #ar{position:fixed;inset:0;overflow:hidden}
 #ar video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 #ar canvas{position:absolute;inset:0}
+#ar canvas.dots{pointer-events:none}
 #ar.sky{background:linear-gradient(#7cc4ef 0%,#bfe6f7 55%,#f3e2c3 100%)}
 #touch{position:fixed;inset:0;z-index:2;touch-action:none}
 .top{position:fixed;left:0;right:0;top:0;padding:calc(12px + env(safe-area-inset-top,0px)) 14px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:3;pointer-events:none}
@@ -82,6 +83,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .guide .phone{position:absolute;left:50%;top:4px;width:50px;height:88px;margin-left:-25px;border-radius:12px;background:#22252b;border:3px solid #fff;transform-origin:50% 100%;animation:tilt 2.6s ease-in-out infinite;box-shadow:0 8px 18px rgba(0,0,0,.45)}
 .guide .phone b{position:absolute;inset:6px 4px;border-radius:6px;background:linear-gradient(#7cc4ef,#8fd14f)}
 .guide.found .scene{display:none}
+.guide.sweep .phone{animation:sweep 2.4s ease-in-out infinite}
+@keyframes sweep{0%,100%{transform:rotateX(45deg) translateX(-34px)}50%{transform:rotateX(45deg) translateX(34px)}}
 @keyframes tilt{0%,15%{transform:rotateX(0)}55%,100%{transform:rotateX(48deg)}}
 @keyframes ring{0%,45%{opacity:0;transform:scale(.6)}65%,100%{opacity:1;transform:scale(1)}}
 .finger{position:fixed;z-index:7;width:0;height:0;pointer-events:none}
@@ -378,8 +381,80 @@ let hasGyro = false, seeing = false, xrHit = null, reticle = null;
     eu.set(e.beta*D, e.alpha*D, -e.gamma*D, 'YXZ'); devQ.setFromEuler(eu); devQ.multiply(q1); devQ.multiply(q0.setFromAxisAngle(zee, -o));
   }); }
 async function askGyro(){ try{ if(window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission) await DeviceOrientationEvent.requestPermission(); }catch(e){} }
-const PLACE = m => m === 'xr' || m === 'gyro';
+const PLACE = m => m === 'xr' || m === 'gyro' || m === 'slam';
 const TABLE = .42;   // modo giroscópio: a mesa fica ~42 cm abaixo do celular
+/* ===== SLAM no navegador (AlvaAR, GPL-3.0): escaneia a mesa pela câmera; funciona no iPhone e em Android sem ARCore ===== */
+const SL = {state:'scan', unit:1, dist:1, pos:new THREE.Vector3(), quat:new THREE.Quaternion(), n:0, lostN:0, lastQ:new THREE.Quaternion(), lastDev:new THREE.Quaternion(), good:false};
+async function startSlam(){
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, audio:false});
+  const vid = document.createElement('video'); vid.setAttribute('playsinline', ''); vid.muted = true; vid.srcObject = stream; $('ar').appendChild(vid); await vid.play();
+  const { AlvaAR } = await import('./zumbi/alva_ar.js');
+  const W = 360, H = Math.round(W*innerHeight/innerWidth);
+  SL.cv = document.createElement('canvas'); SL.cv.width = W; SL.cv.height = H; SL.ctx = SL.cv.getContext('2d', {willReadFrequently:true});
+  SL.vid = vid; SL.W = W; SL.H = H;
+  SL.alva = await AlvaAR.Initialize(W, H, 45);
+  const f = SL.alva.intrinsics.fx;
+  renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding; $('ar').appendChild(renderer.domElement);
+  SL.dots = document.createElement('canvas'); SL.dots.className = 'dots'; SL.dots.width = innerWidth; SL.dots.height = innerHeight; $('ar').appendChild(SL.dots); SL.dotsCtx = SL.dots.getContext('2d');
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(2*Math.atan(H/2/f)*180/Math.PI, innerWidth/innerHeight, .001, 1000);
+  camera.rotation.reorder('YXZ'); scene.add(camera);
+  setupScene(); scene.add(root); root.visible = false;
+  reticle = new THREE.Group(); reticle.visible = false; scene.add(reticle);
+  reticle.add(new THREE.Mesh(new THREE.RingGeometry(.8, 1, 48).rotateX(-Math.PI/2), fxMat(0xffffff, .95)));
+  reticle.add(new THREE.Mesh(new THREE.CircleGeometry(.8, 48).rotateX(-Math.PI/2), fxMat(0x8fd14f, .35)));
+}
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qx = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI/2);
+function poseToThree(pose, q, p){ _m.fromArray(pose); _q.setFromRotationMatrix(_m); q.set(-_q.x, _q.y, _q.z, _q.w); p.set(pose[12], -pose[13], -pose[14]); }
+function slamFrame(){
+  const v = SL.vid; if(!v || v.readyState < 2) return;
+  const vw = v.videoWidth, vh = v.videoHeight, sc = Math.max(SL.W/vw, SL.H/vh), dw = vw*sc, dh = vh*sc;
+  SL.ctx.drawImage(v, (SL.W - dw)/2, (SL.H - dh)/2, dw, dh);
+  const img = SL.ctx.getImageData(0, 0, SL.W, SL.H);
+  const a = SL.alva; a.memImg.write(img.data);
+  const st = a.system.findCameraPose(a.memImg.heap.byteOffset, a.memCam.ptr);
+  if(st === 1){
+    poseToThree(a.memCam.read(16), camera.quaternion, camera.position);
+    SL.lastQ.copy(camera.quaternion); SL.lastDev.copy(devQ); SL.lostN = 0; SL.good = true;
+    if(!tracking || SL.reloc){
+      SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
+      if(++SL.n % 6 === 0){
+        const pl = a.findPlane(200);
+        if(pl){
+          const pq = new THREE.Quaternion(), pp = V(); poseToThree(pl, pq, pp);
+          let q = pq.multiply(_qx);                   // normal do plano vira o "para cima" do jogo
+          const toCam = camera.position.clone().sub(pp);
+          if(hasGyro){ // com giroscópio, usa a gravidade para deixar o jogo bem nivelado
+            const g = V(0, 1, 0).applyQuaternion(devQ.clone().invert()).applyQuaternion(camera.quaternion).normalize();
+            q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), g);
+          } else if(V(0, 1, 0).applyQuaternion(q).dot(toCam) < 0) q.multiply(new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI));
+          // gira em volta da normal para a frente da casa olhar para o jogador
+          const inv = q.clone().invert(), lc = toCam.clone().applyQuaternion(inv);
+          q.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.atan2(lc.x, lc.z)));
+          SL.pos.copy(pp); SL.quat.copy(q); SL.dist = Math.max(.05, toCam.length());
+          if(SL.reloc){ // mapa novo depois de reiniciar: recoloca a casa sozinho no plano achado, sem parar o jogo
+            SL.reloc = false; root.position.copy(pp); root.quaternion.copy(q); SL.unit = SL.dist; applyScale();
+          } else { reticle.position.copy(pp); reticle.quaternion.copy(q); reticle.scale.setScalar(SL.dist*.12); reticle.visible = true; }
+        } else if(SL.n % 30 === 0) reticle.visible = false;
+      }
+      if(!tracking) SL.state = reticle.visible ? 'found' : 'plane';
+    }
+  } else {
+    if(st === 2 && SL.good){   // o SLAM reiniciou: o mapa antigo se perdeu; a casa fica onde está (giroscópio) até achar a mesa de novo
+      SL.good = false; reticle.visible = false;
+      if(tracking) SL.reloc = true;
+    }
+    SL.lostN++;
+    // sem rastreio: segue só a rotação do giroscópio para a imagem não congelar
+    if(tracking && hasGyro){ const d = SL.lastDev.clone().invert().multiply(devQ); camera.quaternion.copy(SL.lastQ).multiply(d); }
+    if(!tracking){
+      SL.state = SL.good ? 'lost' : 'scan'; reticle.visible = false;
+      const pts = a.getFramePoints(), k = innerWidth/SL.W, c = SL.dotsCtx;
+      c.clearRect(0, 0, SL.dots.width, SL.dots.height); c.fillStyle = '#c8ff8a';
+      for(const p of pts) c.fillRect(p.x*k - 1.5, p.y*k - 1.5, 3, 3);
+    }
+  }
+}
 const viewCam = () => (AR === 'xr' && renderer.xr.isPresenting) ? renderer.xr.getCamera() : camera;
 const HW = 3.2, HD = 2.6, d2 = HD/2, WH = 1.7, RH = 1.15, OV = .34, TAN = RH/d2, ANG = Math.atan(RH/d2);
 const roofY = z => WH + RH - Math.abs(z)*TAN + .08;
@@ -624,7 +699,7 @@ function setupScene(){
 }
 function applyScale(){
   if(!root) return;
-  root.scale.setScalar((AR === 'mind' ? BASE_AR : PLACE(AR) ? BASE_XR : 1)*GS);
+  root.scale.setScalar((AR === 'mind' ? BASE_AR : AR === 'slam' ? SL.unit*.036 : PLACE(AR) ? BASE_XR : 1)*GS);
   house.scale.setScalar(HS);
   $('oGame').textContent = Math.round(GS*100) + '%'; $('oHouse').textContent = Math.round(HS*100) + '%';
 }
@@ -687,11 +762,20 @@ let tutStep = null, foundShown = null;
 function fingerAt(x, y){ const f = $('finger'); f.style.left = x + 'px'; f.style.top = y + 'px'; f.hidden = false; }
 function tip(html){ $('tip').innerHTML = html; $('tip').hidden = false; }
 function tutOff(){ $('finger').hidden = true; $('tip').hidden = true; tutStep = null; }
+const GUIDE = {
+  aim:'<b>Aponte o celular para a mesa</b>Incline o celular, como na figura, até aparecer o círculo verde.',
+  scan:'<b>Escaneando a mesa…</b>Aponte para a mesa e mova o celular devagar para os lados, como na figura.',
+  plane:'<b>Quase lá</b>Continue apontando para a mesa até aparecer o círculo verde.',
+  lost:'<b>Perdi a mesa</b>Aponte de novo para o mesmo lugar e mova o celular devagar.',
+  found:'<b>Achou a mesa!</b>Toque na tela para colocar a casa aqui.'
+};
 function placeGuide(found){
-  if(foundShown === found) return; foundShown = found;
-  $('xrHint').classList.toggle('found', found);
-  $('xrHintTxt').innerHTML = found ? '<b>Achou a mesa!</b>Toque na tela para colocar a casa aqui.' : '<b>Aponte o celular para a mesa</b>Incline o celular, como na figura, até aparecer o círculo verde.';
-  if(found) fingerAt(innerWidth/2 + 18, innerHeight/2 + 30); else $('finger').hidden = true;
+  const st = found === true ? 'found' : found === false ? 'aim' : found;
+  if(foundShown === st) return; foundShown = st;
+  $('xrHint').classList.toggle('found', st === 'found');
+  $('xrHint').classList.toggle('sweep', st === 'scan' || st === 'lost');
+  $('xrHintTxt').innerHTML = GUIDE[st];
+  if(st === 'found') fingerAt(innerWidth/2 + 18, innerHeight/2 + 30); else $('finger').hidden = true;
 }
 function fireTutorial(){
   if(LS.get('ztut') === '1') return;
@@ -995,7 +1079,7 @@ addEventListener('keydown', e => { if(e.code === 'Space'){ e.preventDefault(); f
 /* ================= Início ================= */
 async function begin(ar){
   audio(); $('startErr').hidden = true;
-  if(ar === 'mind' || ar === 'gyro') askGyro();
+  if(ar === 'mind' || ar === 'gyro' || ar === 'slam') askGyro();
   const btn = ar ? $('goAR') : $('go3D'); btn.disabled = true; const label = btn.textContent; btn.textContent = ar ? 'Abrindo a câmera…' : 'Montando a cena…';
   try{
     await ready;
@@ -1017,6 +1101,8 @@ async function begin(ar){
         session.addEventListener('end', () => location.reload());
         touchEl.addEventListener('beforexrselect', e => e.preventDefault());
         session.addEventListener('select', () => { if(!session.domOverlayState){ if(!tracking) placeXR(); else fire(aimNDC); } });
+      } else if(ar === 'slam'){
+        await startSlam();
       } else if(ar === 'gyro'){
         // sem WebXR (ex.: iPhone): vídeo da câmera ao fundo + giroscópio; a casa fica numa mesa virtual
         const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, audio:false});
@@ -1062,9 +1148,12 @@ async function begin(ar){
 }
 let xrOK = false;
 if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then(ok => { xrOK = ok; }, () => {});
-$('goAR').addEventListener('click', () => begin(new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'gyro')));
+$('goAR').addEventListener('click', () => begin(new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'slam')));
 function placeXR(){
   if(!reticle || !reticle.visible) return;
+  if(AR === 'slam'){ root.matrixAutoUpdate = true; root.position.copy(SL.pos); root.quaternion.copy(SL.quat); SL.unit = SL.dist; applyScale(); root.visible = true;
+    tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false; $('finger').hidden = true; foundShown = null; SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
+    if(!G || mode === 'menu' || mode === 'end') newGame(); return; }
   const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
   const c = V(); viewCam().getWorldPosition(c);
   root.position.copy(p); root.rotation.set(0, Math.atan2(c.x - p.x, c.z - p.z), 0); root.visible = true;
@@ -1072,12 +1161,12 @@ function placeXR(){
   if(!G || mode === 'menu' || mode === 'end') newGame();
 }
 $('bPlace').addEventListener('click', () => {
-  if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; tutOff(); }
+  if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; tutOff(); if(AR === 'slam'){ SL.state = 'plane'; foundShown = null; } }
   else if(AR === 'mind'){ tracking = false; root.visible = false; $('scan').hidden = false; }
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+window.ZG = {dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
@@ -1105,7 +1194,8 @@ function loop(time, frame){
     if(hits.length){ const pose = hits[0].getPose(renderer.xr.getReferenceSpace()); reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
     else reticle.visible = false;
   }
-  if(PLACE(AR) && !tracking && reticle) placeGuide(reticle.visible);
+  if(AR === 'slam') slamFrame();
+  if(PLACE(AR) && !tracking && reticle) placeGuide(AR === 'slam' ? (reticle.visible ? 'found' : SL.state) : reticle.visible);
   const paused = AR && !tracking;
   if(!AR){
     const r = orbit.dist; camera.position.set(Math.sin(orbit.az)*Math.cos(orbit.el)*r, Math.sin(orbit.el)*r, Math.cos(orbit.az)*Math.cos(orbit.el)*r);

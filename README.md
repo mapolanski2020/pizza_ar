@@ -96,3 +96,17 @@ returning join_code;
 ```
 
 O dono cria o acesso no painel com esse código.
+
+## Jogo da fase 1 (Zumbis da Pizza) e AR na mesa
+
+`zumbi.html` coloca a casa numa superfície real, sem adesivo:
+
+- **Android com ARCore (Chrome):** WebXR com detecção de superfície do próprio celular.
+- **iPhone e Android sem ARCore:** SLAM no navegador com [AlvaAR](https://github.com/alanross/AlvaAR) (`zumbi/alva_ar.js`),
+  que escaneia a mesa pela câmera; o giroscópio deixa o jogo nivelado.
+
+Atenção: o AlvaAR é licenciado em **GPL-3.0** (`zumbi/ALVAAR-LICENSE-GPL3.txt`). Ao distribuir o jogo com ele,
+o código do jogo também precisa ser disponibilizado sob GPL-3.0. Para um produto fechado, troque por uma solução
+comercial ou um app nativo (ARKit/ARCore).
+
+Modelos 3D: KayKit (Kay Lousberg), CC0.
