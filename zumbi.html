@@ -261,7 +261,7 @@ const WEAPONS = [
   {name:'Chuva de Bombas', snd:'bomba4', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
 ];
 const TYPES = {
-  zumbi:{label:'Zumbi', models:['Rogue','Mage','Barbarian','Knight'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.9, from:0, w:5},
+  zumbi:{label:'Zumbi', models:['Rogue','Mage','Barbarian','Knight'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, from:0, w:5},
   escalador:{label:'Zumbis escaladores', models:['Rogue','Barbarian'], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
   esqueleto:{label:'Esqueletos corredores', models:['anims'], hp:1, pts:50, speed:1.15, h:1, walk:'Running_A', ts:.85, from:700, w:3, death:'Death_C_Skeletons'},
   guerreiro:{label:'Esqueletos guerreiros', models:['Skeleton_Warrior'], hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', from:1500, w:2.2, death:'Death_C_Skeletons'},
@@ -503,8 +503,16 @@ function fireworkSnd(p){
 /* Motor da moto: gravação real em loop, rotação acompanha a velocidade */
 let engine = null;
 function engineOn(on, rate = 1){
-  if(on && !engine){ const sm = sample('moto', .0001, rate, 0, .1); if(!sm) return; sm.s.loop = true; sm.g.gain.setTargetAtTime(.55, AC.currentTime, .15); engine = sm; }
-  else if(on && engine) engine.s.playbackRate.setTargetAtTime(rate, AC.currentTime, .2);
+  if(on && !engine){
+    if(!ok() || !SAMPLES.moto) return;
+    // motor de scooter: a gravação acelerada (mais aguda) e sem os graves que soavam como trator
+    const s = AC.createBufferSource(), hp = AC.createBiquadFilter(), pk = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = SAMPLES.moto; s.loop = true; s.playbackRate.value = 1.7*rate;
+    hp.type = 'highpass'; hp.frequency.value = 320; hp.Q.value = .7; pk.type = 'peaking'; pk.frequency.value = 1500; pk.gain.value = 5; pk.Q.value = 1;
+    g.gain.value = .0001; s.connect(hp).connect(pk).connect(g); out(g, 0, .1); s.start();
+    g.gain.setTargetAtTime(.6, AC.currentTime, .12); engine = {s, g};
+  }
+  else if(on && engine) engine.s.playbackRate.setTargetAtTime(1.7*rate, AC.currentTime, .25);
   if(!on && engine){ const e = engine; engine = null; e.g.gain.setTargetAtTime(0, AC.currentTime, .15); setTimeout(() => { try{ e.s.stop(); }catch(x){} }, 700); }
 }
 /* ===== Trilha sonora: groove assustador-divertido (jogo) e festa (vitória) ===== */
@@ -592,7 +600,25 @@ function template(key, zombie, bare){
     o.material = toonOf(o.material, zombie); o.frustumCulled = false;
   } });
   const b = new THREE.Box3(); s.traverse(o => { if(o.isMesh && o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
-  return (TPL[k] = {scene:s, h:Math.max(.5, b.max.y - b.min.y)});
+  const tpl = {scene:s, h:Math.max(.5, b.max.y - b.min.y)};
+  if(zombie){
+    s.updateMatrixWorld(true);
+    const headMesh = []; s.traverse(o => { if(o.isMesh && o.visible && /Head/.test(o.name) && !/Hood|Hat|Helmet/.test(o.name)) headMesh.push(o); });
+    const bone = s.getObjectByName('head');
+    if(headMesh.length && bone){
+      // posição real (após o "skinning") dos vértices da cabeça, no espaço do mundo
+      const hm = headMesh[0], pos = hm.geometry.attributes.position, wb = new THREE.Box3(), v = V(), step = Math.max(1, Math.floor(pos.count/400));
+      for(let n=0;n<pos.count;n+=step){ v.fromBufferAttribute(pos, n); if(hm.isSkinnedMesh){ (hm.applyBoneTransform || hm.boneTransform).call(hm, n, v); } hm.localToWorld(v); wb.expandByPoint(v); }
+      const sz = wb.getSize(V()), c = wb.getCenter(V()), bs = bone.getWorldScale(V()).x;
+      const toBone = p => bone.worldToLocal(p.clone());
+      tpl.face = {
+        eyes:[-1, 1].map(sx => toBone(V(c.x + sx*sz.x*.2, c.y + sz.y*.02, wb.max.z - sz.z*.05))),
+        mouth:toBone(V(c.x, c.y - sz.y*.25, wb.max.z - sz.z*.08)),
+        r:sz.x*.1/bs
+      };
+    }
+  }
+  return (TPL[k] = tpl);
 }
 const ready = Promise.all(FILES.map(f => new Promise((res, rej) => loader.load('zumbi/' + f + '.glb', g => { GL[f] = g; res(); }, undefined, rej))))
   .then(() => { GL.anims.animations.forEach(c => CLIPS[c.name] = c); });
@@ -603,8 +629,22 @@ ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar em
 const blobGeo = new THREE.CircleGeometry(.36, 20).rotateX(-Math.PI/2);
 const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.28, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
 blobMat.userData.outlineParameters = {visible:false};
+const eyeWhite = new THREE.MeshBasicMaterial({color:0xf3f7b0}), eyePupil = new THREE.MeshBasicMaterial({color:0xc4160d}), socketMat = new THREE.MeshBasicMaterial({color:0x14200f}), mouthMat = new THREE.MeshBasicMaterial({color:0x2a0b0b}), toothMat = new THREE.MeshBasicMaterial({color:0xe9e4c8});
+[eyeWhite, eyePupil, socketMat, mouthMat, toothMat].forEach(m => m.userData.outlineParameters = {visible:false});
+function zombieFace(m, f){
+  const bone = m.getObjectByName('head'); if(!bone || !f) return;
+  const r = f.r;   // ~10% da largura da cabeça
+  f.eyes.forEach((p, i) => {
+    const sock = new THREE.Mesh(sphereGeo, socketMat); sock.scale.set(r*1.35, r*1.15, r*.5); sock.position.copy(p); bone.add(sock);
+    const eye = new THREE.Mesh(sphereGeo, eyeWhite); eye.scale.setScalar(r*(i ? .95 : .78)); eye.position.copy(p); eye.position.z += r*.25; bone.add(eye);
+    const pup = new THREE.Mesh(sphereGeo, eyePupil); pup.scale.setScalar(r*.28); pup.position.copy(p); pup.position.z += r*(i ? 1.1 : .95); pup.position.x += r*(i ? -.2 : .25); bone.add(pup);
+  });
+  const mouth = new THREE.Mesh(sphereGeo, mouthMat); mouth.scale.set(r*2.3, r*.75, r*.45); mouth.position.copy(f.mouth); bone.add(mouth);
+  [-1, 0, 1].forEach(k => { const t = new THREE.Mesh(cubeGeo, toothMat); t.scale.set(r*.42, r*.5, r*.2); t.position.copy(f.mouth); t.position.x += k*r*.7; t.position.y += r*.32; t.position.z += r*.3; bone.add(t); });
+}
 function actor(key, h, zombie, bare){
   const T = template(key, zombie, bare), m = skClone(T.scene);
+  if(zombie && bare) zombieFace(m, T.face);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
   const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .06; sh.scale.setScalar(h); g.add(sh);
@@ -618,7 +658,18 @@ function actor(key, h, zombie, bare){
       if(A.cur && A.cur !== a) A.cur.crossFadeTo(a, o.fade == null ? .2 : o.fade, false);
       A.cur = a; A.name = n; return a;
     }};
+  if(zombie && bare){ A.bones = {head:m.getObjectByName('head'), spine:m.getObjectByName('spine'), chest:m.getObjectByName('chest')};
+    A.rest = Object.values(A.bones).filter(Boolean).map(b => [b, b.quaternion.clone()]); A.tilt = rand(.22, .45)*(Math.random() < .5 ? -1 : 1); A.ph = rand(0, 6.28); A.limp = Math.random() < .5 ? 1 : -1; }
   return A;
+}
+/* Andar de zumbi: corcunda, cabeça caída para o lado e balançando, corpo gingando e mancando */
+function shamble(A, t, moving){
+  const b = A.bones; if(!b) return;
+  const p = t*(moving ? 2.4 : 1.3) + A.ph;
+  if(b.spine) b.spine.rotateX(.28);
+  if(b.chest) b.chest.rotateZ(Math.sin(p)*.12);
+  if(b.head){ b.head.rotateZ(A.tilt + Math.sin(p*.5)*.12); b.head.rotateX(.18 + Math.sin(p*.7)*.1); }
+  A.m.rotation.z = Math.sin(p)*.09*A.limp; A.m.position.y = moving ? -Math.abs(Math.sin(p))*.04*A.limp*A.limp : 0;
 }
 const yawTo = (from, to) => Math.atan2(to.x - from.x, to.z - from.z);
 function turn(obj, target, dt, speed = 10){
@@ -822,6 +873,8 @@ function buildHouse(){
   H.traverse(o => { if(o.isMesh) RAYS.push(o); });
 }
 
+const glowMat = new THREE.MeshBasicMaterial({color:0xffb030, transparent:true, opacity:.16, depthWrite:false, blending:THREE.AdditiveBlending}); glowMat.userData.outlineParameters = {visible:false};
+function glowAt(o, sc){ const g = new THREE.Mesh(sphereGeo, glowMat); g.scale.setScalar(sc*.95); g.position.set(o.position.x, sc*.62, o.position.z); world.add(g); }
 function propAt(name, x, z, s, ry = 0, y = 0){
   const o = GL.props.scenes[PROPS.indexOf(name)].clone(true);
   o.traverse(c => { if(c.isMesh) c.material = toonOf(c.material, false); });
@@ -834,7 +887,9 @@ function buildProps(){
   propAt('deadTree', -6.9, -2.6, .42, .4); propAt('deadTreeM', 6.9, -1.8, .45, 2); propAt('deadTree', 2.6, -7.9, .38, 1);
   propAt('pine', -7.6, 2.4, .32, .3); propAt('pineY', 7.7, 2.9, .38, 1.2); propAt('pine', -3.3, -8.3, .27, 2);
   propAt('fence', -3.4, -8.2, .33, 0); propAt('fence', 4.2, -7.9, .33, -.2);
-  propAt('pumpkin', -.78, d2 + .5, .22, .4); propAt('pumpkinS', .74, d2 + .5, .26, -.3); propAt('pumpkin', -2.4, 2.6, .28, .9); propAt('pumpkinS', 2.6, 2.1, .3, 2);
+  propAt('pumpkin', -.78, d2 + .5, .22, .4); propAt('pumpkinS', .74, d2 + .5, .26, -.3);
+  [[-1.5, d2 + .8, .4], [1.5, d2 + .8, .38], [-1.6, d2 + 2.15, .44], [1.6, d2 + 2.15, .42], [-1.5, d2 + 3.4, .36], [1.5, d2 + 3.4, .38], [-2.45, d2 + 1.45, .32], [2.45, d2 + 1.45, .34]]
+    .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); glowAt(o, sc); }); propAt('pumpkin', -2.4, 2.6, .28, .9); propAt('pumpkinS', 2.6, 2.1, .3, 2);
   POSTS.push(propAt('postLantern', -1.0, 4.6, .5, Math.PI), propAt('postLantern', 1.0, 4.6, .5, 0));
   propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
 }
@@ -1073,7 +1128,7 @@ function moveTo(A, to, speed, dt, anim, ts){
 function updateIntro(dt){
   const c = cast; c.t += dt; const t = c.t;
   const stopX = .9, doorP = V(0, 0, d2*HS + .62), inside = V(0, 0, d2*HS - .3);
-  if(t < 3.2 && !engine) engineOn(true);
+  if(t < 3.2){ if(!engine) engineOn(true, 1.15); else engineOn(true, t < 2.2 ? 1.15 : .8); }
   if(t < 3.2){ c.moto.position.x = -7.5 + (stopX + 7.5)*Math.min(1, 1 - Math.pow(1 - t/3.2, 2)); c.moto.position.y = Math.abs(Math.sin(t*14))*.02; }
   else if(!c.off){ c.off = true; engineOn(false);
     c.moto.remove(c.rider.g); world.add(c.rider.g); c.rider.g.position.set(stopX - .1, 0, 5.2); c.rider.shadow.visible = true;
@@ -1092,7 +1147,7 @@ function updateIntro(dt){
   if(c.got && t > c.got + 1.3){
     if(!c.back){ c.back = t; }
     const done = moveTo(c.rider, c.p2 ? V(stopX - .1, 0, 5.2) : V(.2, 0, 4.6), 1.6, dt);
-    if(done && !c.p2) c.p2 = true; else if(done && c.p2 && !c.ride){ c.ride = t; c.rider.g.visible = false; engineOn(true); }
+    if(done && !c.p2) c.p2 = true; else if(done && c.p2 && !c.ride){ c.ride = t; c.rider.g.visible = false; engineOn(true, 1.35); }
     if(t > c.got + 1.6 && !c.resIn){ if(moveTo(c.res, inside, 1.2, dt)){ c.resIn = t; c.res.g.visible = false; } }
   }
   if(c.resIn && !c.closed){ door.rotation.y = Math.max(0, door.rotation.y - dt*3); if(door.rotation.y <= 0){ c.closed = t; } }
@@ -1193,7 +1248,9 @@ function drawBar(Z){ const c = Z.bar.userData.c, g = c.getContext('2d'); g.clear
 
 function updateZombie(Z, dt){
   const A = Z.A, T = Z.T; Z.t += dt;
+  if(A.rest) A.rest.forEach(([b, q]) => b.quaternion.copy(q));   // sem isso o ajuste acumularia a cada quadro
   A.mixer.update(dt);
+  if(A.bones) shamble(A, Z.t, Z.state === 'move' || Z.state === 'break');
   if(Z.squash > 0){ Z.squash = Math.max(0, Z.squash - dt*4); const s = 1 + Math.sin(Z.squash*Math.PI)*.18; A.g.scale.set(s, 2 - s, s); }
   if(Z.state === 'rise'){
     const k = Math.min(1, Z.t/1.0); A.g.position.y = -1.1*T.h*(1 - k);
@@ -1203,7 +1260,7 @@ function updateZombie(Z, dt){
   if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); } return; }
   if(Z.state === 'move'){
     const seg = Z.segs[Z.si], B = seg.to(), p = Z.pos;
-    const dv = B.clone().sub(p), dist = dv.length(), step = seg.sp*dt;
+    const dv = B.clone().sub(p), dist = dv.length(), step = seg.sp*dt*(A.bones && !seg.climb && !seg.hop ? .45 + .9*Math.abs(Math.sin(Z.t*2.4 + A.ph)) : 1);
     if(T.blink && Z.si === 0 && dist > 2.5){ Z.blinkT -= dt; if(Z.blinkT <= 0){ Z.blinkT = rand(2.5, 4); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); p.addScaledVector(dv, Math.min(.6, 1.6/dist)); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); } }
     if(dist <= step){ p.copy(B); Z.si++; if(Z.si >= Z.segs.length){ arrive(Z); return; } Z.segStart = p.clone(); startSeg(Z); }
     else p.addScaledVector(dv, step/dist);
@@ -1541,7 +1598,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
