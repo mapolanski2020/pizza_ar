@@ -952,18 +952,20 @@ function startParty(){
   });
   party = {t:0, fam, fwT:.2, cfT:0};
   setTimeout(() => { if(party) startCine(); }, 700);
-  party.jingleEnd = performance.now()/1000 + victoryJingle();
+  const jl = victoryJingle() || 2.8;
+  party.fam.forEach((m, i) => { m.yell = jl - .05 + i*.12; m.yells = 0; });
 }
 function updateParty(dt){
   const P = party; P.t += dt; const t = P.t;
   P.fam.forEach((m, i) => {
     const A = m.A; A.mixer.update(dt);
-    if(t < m.out) return;
-    A.g.visible = true;
-    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = Math.max(0, (party.jingleEnd || 0) - performance.now()/1000) + rand(.1, 1.2); m.yells = 0; } return; }
-    // "Ehhhhh!": grita e dá um pulão de alegria
     m.yell -= dt;
-    if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(2, 4.5); m.big = .9; cheerVoice(m.voice, A.g.position); }
+    if(t < m.out){ if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); cheerVoice(m.voice, V(0, 0, d2*HS)); } return; }
+    A.g.visible = true;
+    if(!m.arrived){ if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); cheerVoice(m.voice, A.g.position); }
+      if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; } return; }
+    // "Ehhhhh!": grita e dá um pulão de alegria
+    if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); m.big = .9; cheerVoice(m.voice, A.g.position); }
     if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.9; A.play('Jump_Full_Short', {ts:1.1}); A.g.position.y = Math.sin(q*Math.PI)*1.05*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.5)); A.g.rotation.y = 0; if(A.box) A.box.rotation.y += dt*8; return; }
     // pula e comemora sem parar, cada um no seu ritmo
     const k = (t*1.6 + m.ph) % 2;
