@@ -157,7 +157,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
     <div class="hearts" id="hLives" aria-label="Vidas"></div>
     <div class="tools">
       <button class="ghost" id="bSound" type="button" aria-label="Som">Som</button>
-      <button class="ghost" id="bSize" type="button">Tamanho</button>
+      <button class="ghost" id="bSize" type="button" hidden>Tamanho</button>
       <button class="ghost" id="bPlace" type="button" hidden>Reposicionar</button>
       <button class="ghost" id="bQuit" type="button">Sair</button>
     </div>
@@ -263,7 +263,25 @@ function saveP(P){ try{ localStorage.setItem(PKEY, JSON.stringify(P)); }catch(e)
 
 /* ================= Som (sintetizado) ================= */
 let AC = null, muted = LS.get('zmute') === '1';
-function audio(){ if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} } if(AC && AC.state === 'suspended') AC.resume(); }
+let unlocked = false;
+function audio(){
+  try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}   // toca mesmo com o iPhone no silencioso
+  if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} }
+  if(!AC) return;
+  if(AC.state !== 'running') AC.resume();
+  if(!unlocked){ unlocked = true;
+    try{ const b = AC.createBuffer(1, 1, 22050), s = AC.createBufferSource(); s.buffer = b; s.connect(AC.destination); s.start(0); }catch(e){}
+    // elemento <audio> silencioso: no iOS faz a página usar o canal de mídia (alto-falante) em vez do de toque
+    if(/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) try{
+      const n = 4410, buf = new ArrayBuffer(44 + n), v = new DataView(buf), w = (o, t) => { for(let i=0;i<t.length;i++) v.setUint8(o + i, t.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 44100, true); v.setUint32(28, 44100, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+      for(let i=0;i<n;i++) v.setUint8(44 + i, 128);
+      const el = new Audio(URL.createObjectURL(new Blob([buf], {type:'audio/wav'}))); el.loop = true; el.setAttribute('playsinline', ''); el.play().catch(() => {}); window.__keepAudio = el;
+    }catch(e){}
+  }
+}
+['pointerdown', 'touchend', 'click'].forEach(t => addEventListener(t, audio, {passive:true}));
 function env(g, t, a, peak, d){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
 function tone(type, f1, f2, dur, vol, delay = 0){
   if(!AC || muted) return; const t = AC.currentTime + delay, o = AC.createOscillator(), g = AC.createGain();
@@ -290,7 +308,7 @@ function engineOn(on){
     g.gain.value = .06; o.connect(f).connect(g).connect(AC.destination); o.start(); l.start(); engine = {o, l, g}; }
   if(!on && engine){ const e = engine; engine = null; e.g.gain.setTargetAtTime(0, AC.currentTime, .1); setTimeout(() => { try{ e.o.stop(); e.l.stop(); }catch(x){} }, 500); }
 }
-function renderSound(){ $('bSound').textContent = muted ? 'Som: não' : 'Som'; }
+function renderSound(){ $('bSound').textContent = muted ? 'Som: não' : 'Som: sim'; }
 $('bSound').addEventListener('click', () => { muted = !muted; LS.set('zmute', muted ? '1' : '0'); if(muted) engineOn(false); renderSound(); });
 renderSound();
 
@@ -784,11 +802,16 @@ function fireTutorial(){
   fingerAt(r.left + r.width/2, r.top + r.height/2);
   tip(AR ? 'Mire no zumbi com o <b>centro da tela</b> e aperte <b>BOMBA</b>.' : 'Arraste para girar, mire no zumbi e aperte <b>BOMBA</b> (ou toque direto no zumbi).');
 }
+function gestureTip(){
+  if(LS.get('zgest') === '1' || !AR) return; LS.set('zgest', '1');
+  tip('Dica: com <b>dois dedos</b>, gire para rodar a casa e abra ou feche para mudar o tamanho.');
+  setTimeout(() => { if(!tutStep) $('tip').hidden = true; }, 4200);
+}
 function fireTutorialDone(){
   if(tutStep !== 'fire') return;
   LS.set('ztut', '1'); tutOff();
   tip('Isso! Zumbi comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum entrar!');
-  setTimeout(() => { if(!tutStep) $('tip').hidden = true; }, 3200);
+  setTimeout(() => { if(!tutStep){ $('tip').hidden = true; gestureTip(); } }, 3200);
 }
 function endIntro(){
   if(!cast) return;
@@ -797,6 +820,7 @@ function endIntro(){
   door.rotation.y = 0; cast = null;
   $('skip').hidden = true;
   mode = 'play'; showPlayHUD(true); setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
+  if(LS.get('ztut') === '1') setTimeout(() => { if(mode === 'play') gestureTip(); }, 900);
   for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
   G.next = 2.5;
 }
@@ -1046,21 +1070,26 @@ $('bQuit').addEventListener('click', () => { tutOff(); if(cast) endIntro(); engi
 
 /* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
 const touchEl = $('touch'), ptrs = new Map();
-let orbit = {az:.35, el:.72, dist:24}, pinch0 = null, drag = null;
+let orbit = {az:.35, el:.72, dist:24}, pinch0 = null, drag = null, multi = false;
 touchEl.addEventListener('pointerdown', e => {
-  audio(); touchEl.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, t:performance.now()});
-  if(ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = {d:Math.hypot(a.x - b.x, a.y - b.y), gs:GS, dist:orbit.dist}; }
+  audio(); try{ touchEl.setPointerCapture(e.pointerId); }catch(x){} ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, t:performance.now()});
+  if(ptrs.size >= 2) multi = true;
+  if(ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = {d:Math.hypot(a.x - b.x, a.y - b.y), ang:Math.atan2(b.y - a.y, b.x - a.x), gs:GS, dist:orbit.dist, ry:world.rotation.y}; }
 });
 touchEl.addEventListener('pointermove', e => {
   if(!AR && e.pointerType === 'mouse' && !ptrs.size) setAim3D(e.clientX, e.clientY);
   const p = ptrs.get(e.pointerId); if(!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
   if(ptrs.size === 2 && pinch0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
+    let da = Math.atan2(b.y - a.y, b.x - a.x) - pinch0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+    world.rotation.y = pinch0.ry - da;
     if(AR){ GS = clamp(pinch0.gs*r, .3, 3); $('sGame').value = Math.round(GS*100); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 8, 30); return; }
   if(!AR && ptrs.size === 1){ orbit.az -= dx*.008; orbit.el = clamp(orbit.el + dy*.006, .18, 1.35); }
 });
 function endPtr(e){
   const p = ptrs.get(e.pointerId); if(!p) return; ptrs.delete(e.pointerId);
   if(ptrs.size < 2) pinch0 = null;
+  const wasMulti = multi; if(!ptrs.size) multi = false;
+  if(wasMulti) return;
   const moved = Math.hypot(p.x - p.x0, p.y - p.y0), quick = performance.now() - p.t < 400;
   if(moved < 10 && quick && !pinch0){
     if(PLACE(AR) && !tracking){ placeXR(); return; }
@@ -1068,7 +1097,7 @@ function endPtr(e){
     else { setAim3D(e.clientX, e.clientY); fire(aimNDC); }
   }
 }
-touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; });
+touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; if(!ptrs.size) multi = false; });
 touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .3, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 8, 30); }, {passive:false});
 function setAim3D(x, y){ aimNDC.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); const c = $('cross'); c.style.left = x + 'px'; c.style.top = y + 'px'; }
 let holdFire = null;
@@ -1122,7 +1151,7 @@ async function begin(ar){
         ({renderer, scene, camera} = mindar);
         renderer.outputEncoding = THREE.sRGBEncoding;
         anchor = mindar.addAnchor(0);
-        anchor.onTargetFound = () => { seeing = true; if(!tracking){ tracking = true; $('scan').hidden = true; $('bPlace').hidden = false; } };
+        anchor.onTargetFound = () => { seeing = true; if(!tracking){ tracking = true; $('scan').hidden = true;  } };
         anchor.onTargetLost = () => { seeing = false; };
         setupScene(); root.rotation.x = Math.PI/2; scene.add(root); root.matrixAutoUpdate = false; root.visible = false;
         await mindar.start();
@@ -1152,12 +1181,12 @@ $('goAR').addEventListener('click', () => begin(new URLSearchParams(location.sea
 function placeXR(){
   if(!reticle || !reticle.visible) return;
   if(AR === 'slam'){ root.matrixAutoUpdate = true; root.position.copy(SL.pos); root.quaternion.copy(SL.quat); SL.unit = SL.dist; applyScale(); root.visible = true;
-    tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false; $('finger').hidden = true; foundShown = null; SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
+    tracking = true; reticle.visible = false; $('xrHint').hidden = true;  $('finger').hidden = true; foundShown = null; SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
     if(!G || mode === 'menu' || mode === 'end') newGame(); return; }
   const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
   const c = V(); viewCam().getWorldPosition(c);
   root.position.copy(p); root.rotation.set(0, Math.atan2(c.x - p.x, c.z - p.z), 0); root.visible = true;
-  tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false; $('finger').hidden = true; foundShown = null;
+  tracking = true; reticle.visible = false; $('xrHint').hidden = true;  $('finger').hidden = true; foundShown = null;
   if(!G || mode === 'menu' || mode === 'end') newGame();
 }
 $('bPlace').addEventListener('click', () => {
@@ -1166,7 +1195,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+window.ZG = {wr:()=>[world.rotation.y, GS], dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
