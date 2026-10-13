@@ -304,7 +304,7 @@ function bus(){
   MUS = AC.createGain(); MUS.gain.value = .55; MUS.connect(OUT);
   loadSamples();
 }
-const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido'];
+const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4'];
 function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => AC.decodeAudioData(b, res, rej))).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
@@ -326,19 +326,32 @@ function tone(type, f1, f2, dur, vol, delay = 0, pan = 0, wet = .2, dest){
   env(g, t, .008, vol, dur); o.connect(g); if(dest) g.connect(dest); else out(g, pan, wet); o.start(t); o.stop(t + dur + .1);
 }
 const panOf = p => p ? clamp(p.x/7, -.9, .9) : 0;
-/* Explosão em camadas: estouro filtrado + grave com distorção + estalos */
+/* Explosão de bomba: gravação real quando disponível; senão, síntese grave com estrondo longo (sem o "estalo" de tiro) */
+const BOOMS = ['bomba1', 'bomba2', 'bomba3', 'bomba4'];
 function boom(big, p){
-  if(!ok()) return; const t = AC.currentTime, pan = panOf(p), k = big ? 1.25 : 1;
+  if(!ok()) return; const t = AC.currentTime, pan = panOf(p), k = big ? 1.3 : 1;
+  const rec = BOOMS.filter(n => SAMPLES[n]);
+  if(rec.length){ sample(pick(rec), big ? 1 : .85, rand(.85, 1.05)*(big ? .85 : 1), pan, .4); subThump(t, k, pan); return; }
+  // impacto abafado (ataque mais lento que um tiro)
   const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain();
-  f.type = 'lowpass'; f.Q.value = .7; f.frequency.setValueAtTime(5200, t); f.frequency.exponentialRampToValueAtTime(180*k, t + .9*k);
-  env(g, t, .004, .85*k, 1.1*k); n.connect(f).connect(g); out(g, pan, .45); n.start(t, Math.random()); n.stop(t + 1.6*k);
-  const o = AC.createOscillator(), og = AC.createGain(), sh = shaper(6);
-  o.type = 'sine'; o.frequency.setValueAtTime(95, t); o.frequency.exponentialRampToValueAtTime(32, t + .7);
-  env(og, t, .004, .9*k, .75*k); o.connect(sh).connect(og); out(og, pan*.5, .2); o.start(t); o.stop(t + 1.2);
-  for(let i=0;i<(big ? 16 : 10);i++){ const c = noise(), cf = AC.createBiquadFilter(), cg = AC.createGain(), ct = t + .05 + Math.pow(Math.random(), 1.6)*.75*k;
-    cf.type = 'bandpass'; cf.frequency.value = rand(1500, 6000); cf.Q.value = 2; env(cg, ct, .001, rand(.08, .22), rand(.02, .06));
-    c.connect(cf).connect(cg); out(cg, pan + rand(-.3, .3), .3); c.start(ct, Math.random()); c.stop(ct + .12); }
-  sample('quebra', .35, rand(.7, .9), pan, .2, .02);
+  f.type = 'lowpass'; f.Q.value = .5; f.frequency.setValueAtTime(1600*k, t); f.frequency.exponentialRampToValueAtTime(140, t + 1.1*k);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.8*k, t + .018); g.gain.exponentialRampToValueAtTime(.0001, t + 1.4*k);
+  n.connect(f).connect(g); out(g, pan, .55); n.start(t, Math.random()); n.stop(t + 1.6*k);
+  // estrondo longo e grave
+  const r = noise(), rf = AC.createBiquadFilter(), rg = AC.createGain();
+  rf.type = 'lowpass'; rf.frequency.value = 260; rg.gain.setValueAtTime(.0001, t); rg.gain.exponentialRampToValueAtTime(.9*k, t + .06); rg.gain.exponentialRampToValueAtTime(.0001, t + 2.4*k);
+  r.connect(rf).connect(rg); out(rg, pan*.4, .5); r.start(t, Math.random()); r.stop(t + 2.6*k);
+  subThump(t, k, pan);
+  // pedrinhas e destroços caindo depois
+  for(let i=0;i<(big ? 12 : 7);i++){ const c = noise(), cf = AC.createBiquadFilter(), cg = AC.createGain(), ct = t + .35 + Math.random()*1.1*k;
+    cf.type = 'bandpass'; cf.frequency.value = rand(700, 2500); cf.Q.value = 3; env(cg, ct, .002, rand(.03, .09), rand(.03, .08));
+    c.connect(cf).connect(cg); out(cg, pan + rand(-.4, .4), .35); c.start(ct, Math.random()); c.stop(ct + .15); }
+}
+function subThump(t, k, pan){
+  const o = AC.createOscillator(), og = AC.createGain(), sh = shaper(4);
+  o.type = 'sine'; o.frequency.setValueAtTime(72, t); o.frequency.exponentialRampToValueAtTime(26, t + 1.1);
+  og.gain.setValueAtTime(.0001, t); og.gain.exponentialRampToValueAtTime(1*k, t + .02); og.gain.exponentialRampToValueAtTime(.0001, t + 1.3*k);
+  o.connect(sh).connect(og); out(og, pan*.3, .15); o.start(t); o.stop(t + 1.6*k);
 }
 /* Arremesso: "fuuu" de ar */
 function whoosh(){
