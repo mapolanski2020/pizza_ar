@@ -72,6 +72,27 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .pop.big{font-family:var(--display);font-weight:400;font-size:26px;color:#ffe08a}
 .pop.bad{color:#ffb4aa}
 @keyframes rise{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-56px}}
+/* Tutorial rápido: celular inclinando sobre a mesa e dedinho tocando */
+.guide{position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:0 24px calc(150px + env(safe-area-inset-bottom,0px));pointer-events:none;text-align:center}
+.guide p{margin:0;max-width:340px;font-size:14.5px;line-height:1.45;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 16px}
+.guide p b{display:block;font-family:var(--display);font-weight:400;font-size:21px;color:var(--crust);margin-bottom:3px}
+.guide .scene{position:relative;width:170px;height:150px;margin-bottom:14px;perspective:420px}
+.guide .table{position:absolute;left:5px;right:5px;bottom:6px;height:46px;border-radius:50%;background:rgba(194,140,90,.85);box-shadow:0 6px 0 rgba(120,75,40,.9);display:grid;place-items:center}
+.guide .table i{width:56px;height:20px;border-radius:50%;border:3px solid var(--slime);box-shadow:0 0 12px var(--slime);animation:ring 2.6s ease-in-out infinite}
+.guide .phone{position:absolute;left:50%;top:4px;width:50px;height:88px;margin-left:-25px;border-radius:12px;background:#22252b;border:3px solid #fff;transform-origin:50% 100%;animation:tilt 2.6s ease-in-out infinite;box-shadow:0 8px 18px rgba(0,0,0,.45)}
+.guide .phone b{position:absolute;inset:6px 4px;border-radius:6px;background:linear-gradient(#7cc4ef,#8fd14f)}
+.guide.found .scene{display:none}
+@keyframes tilt{0%,15%{transform:rotateX(0)}55%,100%{transform:rotateX(48deg)}}
+@keyframes ring{0%,45%{opacity:0;transform:scale(.6)}65%,100%{opacity:1;transform:scale(1)}}
+.finger{position:fixed;z-index:7;width:0;height:0;pointer-events:none}
+.finger i{position:absolute;left:-6px;top:0;width:44px;height:56px;animation:tap 1.2s ease-in-out infinite;filter:drop-shadow(0 3px 6px rgba(0,0,0,.6));
+  background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 56'%3E%3Cpath d='M14 6c0-3 2-5 4.5-5S23 3 23 6v16l9 2c4 1 6 4 5 8l-3 13c-1 5-5 8-10 8h-5c-4 0-7-2-9-5L4 36c-2-3 0-6 3-6 2 0 3 1 4 2l3 3z' fill='%23fff' stroke='%23222' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E")}
+.finger::before{content:"";position:absolute;left:-18px;top:-18px;width:36px;height:36px;border-radius:50%;border:3px solid #fff;animation:tapRing 1.2s ease-out infinite}
+@keyframes tap{0%,100%{transform:translate(4px,10px)}45%{transform:translate(0,0) scale(.92)}}
+@keyframes tapRing{0%,40%{opacity:0;transform:scale(.4)}50%{opacity:1}100%{opacity:0;transform:scale(1.4)}}
+.tip{position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom,0px));width:min(320px,calc(100% - 32px));background:var(--panel);border:1px solid var(--crust);border-radius:16px;padding:11px 14px;font-size:14.5px;line-height:1.4;text-align:center;pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.tip b{color:var(--crust)}
+@media (prefers-reduced-motion:reduce){.guide .phone,.guide .table i,.finger i,.finger::before{animation:none}.guide .phone{transform:rotateX(48deg)}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
 .skip{position:fixed;right:14px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:4}
@@ -151,7 +172,12 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
 </div>
 <button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
 <div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa. Depois de aparecer, a casa fica fixa no lugar.</p></div>
-<div class="scan" id="xrHint" hidden><p id="xrHintTxt">Aponte para a mesa ou para a caixa da pizza.<br>Quando aparecer o círculo, toque para colocar a casa.</p></div>
+<div class="guide" id="xrHint" hidden>
+  <div class="scene" id="gScene" aria-hidden="true"><div class="table"><i></i></div><div class="phone"><b></b></div></div>
+  <p id="xrHintTxt"><b>Aponte o celular para a mesa</b>Incline o celular, como na figura, até aparecer o círculo verde.</p>
+</div>
+<div class="finger" id="finger" hidden aria-hidden="true"><i></i></div>
+<div class="tip" id="tip" hidden role="status"></div>
 <div class="banner" id="banner" aria-live="polite"><b id="bTitle"></b><span id="bSub"></span></div>
 
 <section class="screen" id="start">
@@ -656,13 +682,37 @@ function updateIntro(dt){
       const src = pick([chimneyTop.clone().multiplyScalar(HS), ...ENTRIES.map(e => V(e.p.x*.8, 1.0, e.p.z*.8).multiplyScalar(HS))]); stink(src); } }
   if(c.smell && t > c.smell + 2.6) endIntro();
 }
+/* ===== Tutorial rápido ===== */
+let tutStep = null, foundShown = null;
+function fingerAt(x, y){ const f = $('finger'); f.style.left = x + 'px'; f.style.top = y + 'px'; f.hidden = false; }
+function tip(html){ $('tip').innerHTML = html; $('tip').hidden = false; }
+function tutOff(){ $('finger').hidden = true; $('tip').hidden = true; tutStep = null; }
+function placeGuide(found){
+  if(foundShown === found) return; foundShown = found;
+  $('xrHint').classList.toggle('found', found);
+  $('xrHintTxt').innerHTML = found ? '<b>Achou a mesa!</b>Toque na tela para colocar a casa aqui.' : '<b>Aponte o celular para a mesa</b>Incline o celular, como na figura, até aparecer o círculo verde.';
+  if(found) fingerAt(innerWidth/2 + 18, innerHeight/2 + 30); else $('finger').hidden = true;
+}
+function fireTutorial(){
+  if(LS.get('ztut') === '1') return;
+  tutStep = 'fire';
+  const r = $('fire').getBoundingClientRect();
+  fingerAt(r.left + r.width/2, r.top + r.height/2);
+  tip(AR ? 'Mire no zumbi com o <b>centro da tela</b> e aperte <b>BOMBA</b>.' : 'Arraste para girar, mire no zumbi e aperte <b>BOMBA</b> (ou toque direto no zumbi).');
+}
+function fireTutorialDone(){
+  if(tutStep !== 'fire') return;
+  LS.set('ztut', '1'); tutOff();
+  tip('Isso! Zumbi comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum entrar!');
+  setTimeout(() => { if(!tutStep) $('tip').hidden = true; }, 3200);
+}
 function endIntro(){
   if(!cast) return;
   engineOn(false);
   [cast.moto, cast.rider.g, cast.res.g].forEach(o => o.parent && o.parent.remove(o));
   door.rotation.y = 0; cast = null;
   $('skip').hidden = true;
-  mode = 'play'; showPlayHUD(true);
+  mode = 'play'; showPlayHUD(true); setTimeout(() => { if(mode === 'play') fireTutorial(); }, 900);
   for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
   G.next = 2.5;
 }
@@ -811,7 +861,7 @@ function fire(ndc){
   if(mode !== 'play' || !G || G.paused) return;
   if(coolT > 0) return;
   const hit = aimAt(ndc || aimNDC); if(!hit) return;
-  const w = WEAPONS[G.w]; coolT = w.cd; audio();
+  const w = WEAPONS[G.w]; coolT = w.cd; audio(); fireTutorialDone();
   const start = camLocal(); const T0 = hit.p;
   for(let i=0;i<w.n;i++){
     const off = i === 0 ? V() : V(Math.cos(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1), 0, Math.sin(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1));
@@ -870,7 +920,7 @@ function showPlayHUD(on){ $('hudB').hidden = !on; $('cross').hidden = !on; marke
 let endT = 0, endWon = false;
 function gameOver(won){
   if(mode !== 'play') return;
-  mode = 'ending'; endWon = won; endT = 3.4; showPlayHUD(false); $('sizer').hidden = true;
+  mode = 'ending'; endWon = won; endT = 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
   if(won){
     banner('Casa salva!', '5.000 pontos: a pizza está a salvo');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
@@ -907,7 +957,7 @@ function showEnd(){
 function cleanupEnd(){ if(G && G.hero){ world.remove(G.hero.g); G.hero = null; } door.rotation.y = 0; }
 $('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
 $('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
-$('bQuit').addEventListener('click', () => { if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
+$('bQuit').addEventListener('click', () => { tutOff(); if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
   ['hud', 'hudB', 'cross', 'touch', 'scan', 'xrHint', 'end', 'skip', 'sizer'].forEach(id => $(id).hidden = true); $('start').hidden = false; });
 
 /* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
@@ -1018,11 +1068,11 @@ function placeXR(){
   const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
   const c = V(); viewCam().getWorldPosition(c);
   root.position.copy(p); root.rotation.set(0, Math.atan2(c.x - p.x, c.z - p.z), 0); root.visible = true;
-  tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false;
+  tracking = true; reticle.visible = false; $('xrHint').hidden = true; $('bPlace').hidden = false; $('finger').hidden = true; foundShown = null;
   if(!G || mode === 'menu' || mode === 'end') newGame();
 }
 $('bPlace').addEventListener('click', () => {
-  if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; }
+  if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; tutOff(); }
   else if(AR === 'mind'){ tracking = false; root.visible = false; $('scan').hidden = false; }
 });
 $('go3D').addEventListener('click', () => begin(false));
@@ -1055,6 +1105,7 @@ function loop(time, frame){
     if(hits.length){ const pose = hits[0].getPose(renderer.xr.getReferenceSpace()); reticle.visible = true; reticle.matrix.fromArray(pose.transform.matrix); }
     else reticle.visible = false;
   }
+  if(PLACE(AR) && !tracking && reticle) placeGuide(reticle.visible);
   const paused = AR && !tracking;
   if(!AR){
     const r = orbit.dist; camera.position.set(Math.sin(orbit.az)*Math.cos(orbit.el)*r, Math.sin(orbit.el)*r, Math.cos(orbit.az)*Math.cos(orbit.el)*r);
