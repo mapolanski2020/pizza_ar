@@ -422,7 +422,8 @@ function ding(){
 const VOZ = {pai:{f0:135, f:[560, 1720, 2450]}, mae:{f0:240, f:[620, 2050, 2900]}, filho:{f0:330, f:[680, 2250, 3200]}};
 function cheerVoice(who, p){
   if(!ok()) return;
-  if(SAMPLES[who]){ sample(who, 1.2, rand(.97, 1.03), panOf(p), .25); return; }   // voz gravada do morador
+  if(SAMPLES[who]){ sample(who, 1.2, rand(.97, 1.03), panOf(p), .25); }   // só voz gravada do morador (a sintetizada foi retirada)
+  return;
   const v = VOZ[who] || VOZ.pai, t = AC.currentTime + rand(0, .06), dur = rand(1.05, 1.35), pan = panOf(p);
   const src = AC.createOscillator(); src.type = 'sawtooth';
   src.frequency.setValueAtTime(v.f0*.9, t); src.frequency.exponentialRampToValueAtTime(v.f0*1.35, t + .28);
