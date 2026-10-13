@@ -900,7 +900,7 @@ function updateParty(dt){
     const A = m.A; A.mixer.update(dt);
     if(t < m.out) return;
     A.g.visible = true;
-    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = .15 + i*.25; } return; }
+    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = .1 + i*.6; } return; }
     // "Ehhhhh!": grita e dá um pulão de alegria
     m.yell -= dt;
     if(m.yell <= 0 && !m.yelled){ m.yelled = true; m.big = .9; cheerVoice(m.voice, A.g.position); popup('Ehhhhh!', V(A.g.position.x, m.h + .7, A.g.position.z), 'yay'); }
