@@ -876,9 +876,9 @@ function startParty(){
   const moto = scooter(); moto.rotation.y = Math.PI/2; moto.position.set(-8, 0, 5.85); world.add(moto);
   const rider = actor('Knight', 1.05, false); moto.add(rider.g); rider.g.position.set(0, .28, -.18); rider.shadow.visible = false; rider.play('Sit_Chair_Idle');
   party = {t:0, fam, fwT:.2, cfT:0, moto, rider, beeped:false};
-  fanfare();
+  if(!SAMPLES.musica_vitoria) fanfare();
   if(SAMPLES.familia) setTimeout(() => { if(party) sample('familia', 1, 1, 0, .3); }, 900);
-  setTimeout(() => { if(!party) return; if(SAMPLES.musica_vitoria){ const m = sample('musica_vitoria', .8, 1, 0, .15); if(m){ m.s.loop = true; party.track = m; } } else music('party'); }, 1300);
+  setTimeout(() => { if(!party) return; if(SAMPLES.musica_vitoria){ const m = sample('musica_vitoria', .9, 1, 0, .15); if(m){ m.s.loop = true; party.track = m; } } else music('party'); }, SAMPLES.musica_vitoria ? 250 : 1300);
 }
 function updateParty(dt){
   const P = party; P.t += dt; const t = P.t;
