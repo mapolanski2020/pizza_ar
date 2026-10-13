@@ -242,11 +242,11 @@ const GOAL = 5000, LIVES = 5;
 // Atalho de teste: zumbi.html?teste=4900 começa com 4.900 pontos (não vale estrelas nem libera fase)
 const TESTE = clamp(parseInt(new URLSearchParams(location.search).get('teste')) || 0, 0, GOAL - 50);
 const WEAPONS = [
-  {name:'Bomba', kills:0, R:1.15, dmg:1, n:1, cd:.42, color:0x26242b, size:.17},
-  {name:'Bomba de Pimenta', kills:10, R:1.5, dmg:1, n:1, cd:.4, color:0xd8352a, size:.19},
-  {name:'Bomba Tripla', kills:25, R:1.25, dmg:1, n:3, spread:1.1, cd:.5, color:0x2f6fd6, size:.15},
-  {name:'Bomba Calabresa', kills:45, R:2.1, dmg:2, n:1, cd:.55, color:0xa4472b, size:.27},
-  {name:'Chuva de Bombas', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
+  {name:'Bomba', snd:'bomba1', kills:0, R:1.15, dmg:1, n:1, cd:.42, color:0x26242b, size:.17},
+  {name:'Bomba de Pimenta', snd:'bomba2', kills:10, R:1.5, dmg:1, n:1, cd:.4, color:0xd8352a, size:.19},
+  {name:'Bomba Tripla', snd:'bomba3', kills:25, R:1.25, dmg:1, n:3, spread:1.1, cd:.5, color:0x2f6fd6, size:.15},
+  {name:'Bomba Calabresa', snd:'dinamite', kills:45, R:2.1, dmg:2, n:1, cd:.55, color:0xa4472b, size:.27},
+  {name:'Chuva de Bombas', snd:'bomba4', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
 ];
 const TYPES = {
   zumbi:{label:'Zumbi', models:['Rogue','Rogue_Hooded','Mage'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.9, from:0, w:5},
@@ -304,7 +304,7 @@ function bus(){
   MUS = AC.createGain(); MUS.gain.value = .55; MUS.connect(OUT);
   loadSamples();
 }
-const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4'];
+const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4', 'dinamite'];
 function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => { const pr = AC.decodeAudioData(b, res, rej); if(pr && pr.catch) pr.catch(() => {}); })).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
@@ -328,10 +328,11 @@ function tone(type, f1, f2, dur, vol, delay = 0, pan = 0, wet = .2, dest){
 const panOf = p => p ? clamp(p.x/7, -.9, .9) : 0;
 /* Explosão de bomba: gravação real quando disponível; senão, síntese grave com estrondo longo (sem o "estalo" de tiro) */
 const BOOMS = ['bomba1', 'bomba2', 'bomba3', 'bomba4'];
-function boom(big, p){
+function boom(big, p, snd){
   if(!ok()) return; const t = AC.currentTime, pan = panOf(p), k = big ? 1.3 : 1;
-  const rec = BOOMS.filter(n => SAMPLES[n]);
-  if(rec.length){ sample(pick(rec), big ? 1 : .85, rand(.85, 1.05)*(big ? .85 : 1), pan, .4); subThump(t, k, pan); return; }
+  // cada arma tem a sua explosão gravada; se faltar, usa outra gravada; se não houver nenhuma, sintetiza
+  const name = SAMPLES[snd] ? snd : BOOMS.find(n => SAMPLES[n]);
+  if(name){ sample(name, big ? 1 : .85, rand(.94, 1.06), pan, .4); subThump(t, k*.7, pan); return; }
   // impacto abafado (ataque mais lento que um tiro)
   const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain();
   f.type = 'lowpass'; f.Q.value = .5; f.frequency.setValueAtTime(1600*k, t); f.frequency.exponentialRampToValueAtTime(140, t + 1.1*k);
@@ -1216,7 +1217,7 @@ function updateBombs(dt){
   }
 }
 function explode(p, w){
-  explosionFX(p, w.R, w.color); boom(w.R > 1.8, p);
+  explosionFX(p, w.R, w.color); boom(w.R > 1.8, p, w.snd);
   for(const Z of ZS.slice()){
     const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5;
     if(c.distanceTo(p) < w.R + .25*Z.T.h) damage(Z, w.dmg, p);
@@ -1258,7 +1259,7 @@ function gameOver(won){
   if(won){
     banner('VITÓRIA!', 'Casa salva! A família vai comer a pizza', 'win');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
-    boom(true); startParty();
+    boom(true, null, 'dinamite'); startParty();
   } else {
     banner('Os zumbis comeram a pizza!', 'Tente de novo', 'slime');
     ZS.forEach(Z => { if(Z.state === 'move' || Z.state === 'break' || Z.state === 'hit'){ Z.state = 'party'; Z.A.play(Math.random() < .5 ? 'Cheer' : 'Taunt'); } });
