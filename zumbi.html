@@ -461,6 +461,37 @@ function cheerVoice(who, p){
   out(voice, pan, .35);
   [src, vib, br].forEach(o => { o.start(t); o.stop(t + dur + .05); });
 }
+/* Musiquinha de vitória (composição original, estilo videogame): "tan-tan-tan-taaan!" ~2,6 s */
+function victoryJingle(){
+  if(!ok()) return 0;
+  const t0 = AC.currentTime + .05, q = .115;   // colcheia rápida
+  // metais (trompete/trombone): 3 serras levemente desafinadas, filtro que "abre" no ataque e vibrato nas notas longas
+  const lead = (f, t, d, v = .16) => {
+    const g = AC.createGain(), lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 1.2;
+    lp.frequency.setValueAtTime(600, t); lp.frequency.exponentialRampToValueAtTime(Math.min(7000, f*7), t + .05); lp.frequency.exponentialRampToValueAtTime(Math.min(4200, f*4.5), t + .18);
+    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(v, t + .035); g.gain.setValueAtTime(v*.85, t + Math.max(.05, d*.8)); g.gain.exponentialRampToValueAtTime(.0001, t + d + .08);
+    lp.connect(g); out(g, 0, .35);
+    [-9, 0, 8].forEach(det => { const o = AC.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+      if(d > .4){ const vib = AC.createOscillator(), vg = AC.createGain(); vib.frequency.value = 5.5; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(f*.012, t + .35); vib.connect(vg).connect(o.frequency); vib.start(t); vib.stop(t + d + .1); }
+      o.connect(lp); o.start(t); o.stop(t + d + .12); });
+  };
+  const roll = (t, dur) => { for(let k=0;k<dur/.035;k++){ const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(), tt = t + k*.035; f.type = 'bandpass'; f.frequency.value = 2200; env(g, tt, .002, .05 + .25*k*.035/dur, .05); n.connect(f).connect(g); out(g, 0, .3); n.start(tt, Math.random()); n.stop(tt + .08); } };
+  const crash = t => { const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'highpass'; f.frequency.value = 4500; env(g, t, .003, .35, 1.8); n.connect(f).connect(g); out(g, 0, .5); n.start(t, Math.random()); n.stop(t + 2); };
+  const bass = (f, t, d) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = 'triangle'; o.frequency.value = f; env(g, t, .01, .32, d); o.connect(g); out(g, 0, .1); o.start(t); o.stop(t + d + .05); };
+  const hit = (t, v = .5) => { const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'bandpass'; f.frequency.value = 1800; env(g, t, .002, v*.4, .12); n.connect(f).connect(g); out(g, 0, .3); n.start(t, Math.random()); n.stop(t + .2);
+    const o = AC.createOscillator(), og = AC.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(50, t + .12); env(og, t, .002, v, .2); o.connect(og); out(og, 0, .05); o.start(t); o.stop(t + .25); };
+  const N = n => 440*Math.pow(2, (n - 69)/12);
+  // subida rápida (tan-tan-tan) e nota longa (taaan), depois o acorde final
+  const mel = [[67, 0, 1], [72, 1, 1], [76, 2, 1], [79, 3, 2], [76, 5, 1], [79, 6, 6],   // sol-dó-mi-SOL-mi-SOOOL
+               [77, 13, 1], [81, 14, 1], [84, 15, 7]];                                  // fá-lá-DÓÓÓ
+  mel.forEach(([n, s, l]) => lead(N(n), t0 + s*q, l*q*.95 + .04, s >= 13 ? .2 : .16));
+  [[72, 79, 84], [77, 81, 84]].forEach((ch, i) => ch.forEach(n => lead(N(n - 12), t0 + (i ? 15 : 6)*q, (i ? 7 : 6)*q, .07)));
+  bass(N(48), t0, 6*q); bass(N(43), t0 + 6*q, 7*q); bass(N(41), t0 + 13*q, 2*q); bass(N(48), t0 + 15*q, 8*q);
+  [0, 3, 6, 13, 15].forEach(s => hit(t0 + s*q, s >= 13 ? .6 : .45));
+  roll(t0 + 10*q, 3*q); crash(t0 + 15*q);
+  [16, 17, 18, 19, 20, 21].forEach((s, i) => { const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(), t = t0 + s*q; f.type = 'highpass'; f.frequency.value = 6000; env(g, t, .002, .05 + i*.01, .06); n.connect(f).connect(g); out(g, 0, .2); n.start(t, Math.random()); n.stop(t + .1); });
+  return .05 + 23*q + .2;
+}
 function horn(){ if(!ok()) return; [0, .22].forEach(d => { [349, 440].forEach(f => { const t = AC.currentTime + d, o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'square'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = 1400; env(g, t, .01, .09, .16); o.connect(lp).connect(g); out(g, .3, .2); o.start(t); o.stop(t + .25); }); }); }
 function fireworkSnd(p){
   if(!ok()) return; const pan = panOf(p), t = AC.currentTime;
@@ -921,7 +952,7 @@ function startParty(){
   });
   party = {t:0, fam, fwT:.2, cfT:0};
   setTimeout(() => { if(party) startCine(); }, 700);
-  if(SAMPLES.familia) setTimeout(() => { if(party) sample('familia', 1, 1, 0, .3); }, 900);
+  party.jingleEnd = performance.now()/1000 + victoryJingle();
 }
 function updateParty(dt){
   const P = party; P.t += dt; const t = P.t;
@@ -929,7 +960,7 @@ function updateParty(dt){
     const A = m.A; A.mixer.update(dt);
     if(t < m.out) return;
     A.g.visible = true;
-    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = rand(.1, 1.4); m.yells = 0; } return; }
+    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; m.yell = Math.max(0, (party.jingleEnd || 0) - performance.now()/1000) + rand(.1, 1.2); m.yells = 0; } return; }
     // "Ehhhhh!": grita e dá um pulão de alegria
     m.yell -= dt;
     if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(2, 4.5); m.big = .9; cheerVoice(m.voice, A.g.position); }
@@ -1508,7 +1539,14 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {audio:()=>({st:AC&&AC.state, smp:Object.keys(SAMPLES), mus:mus&&mus.kind, eng:!!engine}), wr:()=>[world.rotation.y, GS], dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+window.ZG = {renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+    AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
+    AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
+    const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); b.setUint32(4, 36 + n*4, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 2, true); b.setUint32(24, 44100, true); b.setUint32(28, 44100*4, true); b.setUint16(32, 4, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n*4, true);
+    for(let i=0;i<n;i++){ b.setInt16(44 + i*4, Math.max(-1, Math.min(1, L[i]))*32767, true); b.setInt16(46 + i*4, Math.max(-1, Math.min(1, R[i]))*32767, true); }
+    let s = ''; const u = new Uint8Array(b.buffer); for(let i=0;i<u.length;i+=8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); },
+  audio:()=>({st:AC&&AC.state, smp:Object.keys(SAMPLES), mus:mus&&mus.kind, eng:!!engine}), wr:()=>[world.rotation.y, GS], dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
