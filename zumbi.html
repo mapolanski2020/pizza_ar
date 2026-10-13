@@ -360,13 +360,13 @@ ready.then(() => { $('goAR').disabled = false; $('goAR').textContent = 'Jogar em
 
 /* ================= Personagens ================= */
 const blobGeo = new THREE.CircleGeometry(.36, 20).rotateX(-Math.PI/2);
-const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.28, depthWrite:false});
+const blobMat = new THREE.MeshBasicMaterial({color:0x000000, transparent:true, opacity:.28, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4, polygonOffsetUnits:-8});
 blobMat.userData.outlineParameters = {visible:false};
 function actor(key, h, zombie){
   const T = template(key, zombie), m = skClone(T.scene);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
-  const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .02; sh.scale.setScalar(h); g.add(sh);
+  const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .06; sh.scale.setScalar(h); g.add(sh);
   const mixer = new THREE.AnimationMixer(m), acts = {};
   const A = {g, m, mixer, shadow:sh, cur:null, name:'',
     play(n, o = {}){
@@ -402,7 +402,7 @@ async function askGyro(){ try{ if(window.DeviceOrientationEvent && DeviceOrienta
 const PLACE = m => m === 'xr' || m === 'gyro' || m === 'slam';
 const TABLE = .42;   // modo giroscópio: a mesa fica ~42 cm abaixo do celular
 /* ===== SLAM no navegador (AlvaAR, GPL-3.0): escaneia a mesa pela câmera; funciona no iPhone e em Android sem ARCore ===== */
-const SL = {state:'scan', unit:1, dist:1, pos:new THREE.Vector3(), quat:new THREE.Quaternion(), n:0, lostN:0, lastQ:new THREE.Quaternion(), lastDev:new THREE.Quaternion(), good:false};
+const SL = {tq:new THREE.Quaternion(), tp:new THREE.Vector3(), state:'scan', unit:1, dist:1, pos:new THREE.Vector3(), quat:new THREE.Quaternion(), n:0, lostN:0, lastQ:new THREE.Quaternion(), lastDev:new THREE.Quaternion(), good:false};
 async function startSlam(){
   const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, audio:false});
   const vid = document.createElement('video'); vid.setAttribute('playsinline', ''); vid.muted = true; vid.srcObject = stream; $('ar').appendChild(vid); await vid.play();
@@ -423,6 +423,7 @@ async function startSlam(){
   reticle.add(new THREE.Mesh(new THREE.CircleGeometry(.8, 48).rotateX(-Math.PI/2), fxMat(0x8fd14f, .35)));
 }
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qx = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), Math.PI/2);
+function fitClip(){ if(window.NOCLIP) return; camera.near = SL.unit*.01; camera.far = SL.unit*100; camera.updateProjectionMatrix(); }
 function poseToThree(pose, q, p){ _m.fromArray(pose); _q.setFromRotationMatrix(_m); q.set(-_q.x, _q.y, _q.z, _q.w); p.set(pose[12], -pose[13], -pose[14]); }
 function slamFrame(){
   const v = SL.vid; if(!v || v.readyState < 2) return;
@@ -432,7 +433,10 @@ function slamFrame(){
   const a = SL.alva; a.memImg.write(img.data);
   const st = a.system.findCameraPose(a.memImg.heap.byteOffset, a.memCam.ptr);
   if(st === 1){
-    poseToThree(a.memCam.read(16), camera.quaternion, camera.position);
+    poseToThree(a.memCam.read(16), SL.tq, SL.tp);
+    // suaviza o tremido do rastreio (filtro leve; movimentos grandes passam direto)
+    const jump = camera.position.distanceTo(SL.tp) > SL.unit*.15 || !SL.good;
+    camera.position.lerp(SL.tp, jump ? 1 : .45); camera.quaternion.slerp(SL.tq, jump ? 1 : .5);
     SL.lastQ.copy(camera.quaternion); SL.lastDev.copy(devQ); SL.lostN = 0; SL.good = true;
     if(!tracking || SL.reloc){
       SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
@@ -451,7 +455,7 @@ function slamFrame(){
           q.multiply(new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.atan2(lc.x, lc.z)));
           SL.pos.copy(pp); SL.quat.copy(q); SL.dist = Math.max(.05, toCam.length());
           if(SL.reloc){ // mapa novo depois de reiniciar: recoloca a casa sozinho no plano achado, sem parar o jogo
-            SL.reloc = false; root.position.copy(pp); root.quaternion.copy(q); SL.unit = SL.dist; applyScale();
+            SL.reloc = false; root.position.copy(pp); root.quaternion.copy(q); SL.unit = SL.dist; applyScale(); fitClip();
           } else { reticle.position.copy(pp); reticle.quaternion.copy(q); reticle.scale.setScalar(SL.dist*.12); reticle.visible = true; }
         } else if(SL.n % 30 === 0) reticle.visible = false;
       }
@@ -508,9 +512,9 @@ function buildGround(){
   const bottom = new THREE.Mesh(new THREE.CircleGeometry(9.1, 72).rotateX(Math.PI/2), mat(0x6b4428)); bottom.position.y = -.6; world.add(bottom);
   // rua
   const road = canvasTex(1024, 128, (g, w, h) => { g.fillStyle = '#4a4d55'; g.fillRect(0, 0, w, h); g.fillStyle = '#f2d36b'; for(let x=20;x<w;x+=90) g.fillRect(x, h/2 - 5, 50, 10); g.fillStyle = 'rgba(255,255,255,.08)'; for(let i=0;i<300;i++) g.fillRect(Math.random()*w, Math.random()*h, 3, 3); });
-  const rd = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 1.5).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:road, gradientMap:GRAD}));
+  const rd = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 1.5).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:road, gradientMap:GRAD, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-4}));
   rd.material.userData.outlineParameters = {visible:false};
-  rd.position.set(0, .015, 6.1); world.add(rd);
+  rd.position.set(0, .04, 6.1); world.add(rd);
   const curb = box(14.6, .08, .16, 0xd9d2c5, .03); at(curb, 0, .04, 5.28);
 }
 
@@ -1180,7 +1184,7 @@ if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSuppor
 $('goAR').addEventListener('click', () => begin(new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'slam')));
 function placeXR(){
   if(!reticle || !reticle.visible) return;
-  if(AR === 'slam'){ root.matrixAutoUpdate = true; root.position.copy(SL.pos); root.quaternion.copy(SL.quat); SL.unit = SL.dist; applyScale(); root.visible = true;
+  if(AR === 'slam'){ root.matrixAutoUpdate = true; root.position.copy(SL.pos); root.quaternion.copy(SL.quat); SL.unit = SL.dist; applyScale(); root.visible = true; fitClip();
     tracking = true; reticle.visible = false; $('xrHint').hidden = true;  $('finger').hidden = true; foundShown = null; SL.dotsCtx.clearRect(0, 0, SL.dots.width, SL.dots.height);
     if(!G || mode === 'menu' || mode === 'end') newGame(); return; }
   const p = V(), q = new THREE.Quaternion(), sc = V(); reticle.matrix.decompose(p, q, sc);
