@@ -258,6 +258,7 @@ const TYPES = {
   gigante:{label:'Zumbis gigantes', models:['Knight'], zombie:true, hp:5, pts:100, strong:true, speed:.42, h:1.75, walk:'Walking_D_Skeletons', ts:.7, from:3800, w:1, breakT:1.5}
 };
 
+Object.entries(TYPES).forEach(([k, T]) => T.key = k);
 /* ===== Cartão fidelidade ===== */
 const CFG = window.PIZZA_CONFIG || {};
 const SB = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
@@ -303,7 +304,7 @@ function bus(){
   MUS = AC.createGain(); MUS.gain.value = .55; MUS.connect(OUT);
   loadSamples();
 }
-const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida'];
+const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido'];
 function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => r.arrayBuffer()).then(b => new Promise((res, rej) => AC.decodeAudioData(b, res, rej))).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
@@ -347,7 +348,31 @@ function whoosh(){
   n.connect(f).connect(g); out(g, 0, .1); n.start(t, Math.random()); n.stop(t + .4);
 }
 /* Gemido de zumbi: voz sintetizada com formantes (o-a), vibrato e rouquidão */
-function groan(p, kind = 'groan'){
+/* Vozes gravadas de zumbi (CC0, ianzazz): cada espécie tem seu gemido e seu tom */
+const VOICES = {
+  zumbi:{groan:['z_gemido1', 'z_gemido2'], rate:[.92, 1.08], hurt:'z_dor'},
+  escalador:{groan:['z_gemido2'], rate:[1.05, 1.18], hurt:'z_dor'},
+  esqueleto:{groan:['z_rapido'], rate:[1.05, 1.25], hurt:'z_rapido'},
+  guerreiro:{groan:['z_gemido1'], rate:[.8, .88], hurt:'z_dor'},
+  ninja:{groan:['z_rapido'], rate:[1.25, 1.4], hurt:'z_rapido'},
+  mago:{groan:['z_gemido2'], rate:[1.25, 1.4], hurt:'z_dor'},
+  gigante:{groan:['z_gemido1', 'z_gemido2'], rate:[.62, .7], hurt:'z_dor'}
+};
+let lastGroan = 0;
+function groan(p, kind = 'groan', T){
+  if(!ok()) return;
+  const v = VOICES[T && T.key] || VOICES.zumbi;
+  if(SAMPLES.z_gemido1){
+    const now = AC.currentTime; if(kind === 'groan' && now - lastGroan < .35) return; if(kind === 'groan') lastGroan = now;
+    const r = rand(v.rate[0], v.rate[1]), pan = panOf(p);
+    if(kind === 'groan') sample(pick(v.groan), .8, r, pan, .3);
+    else if(kind === 'hurt') sample(v.hurt, .7, r*1.1, pan, .2);
+    else sample(v.hurt, .9, r*.82, pan, .35);
+    return;
+  }
+  groanSynth(p, kind);
+}
+function groanSynth(p, kind = 'groan'){
   if(!ok()) return; const t = AC.currentTime, pan = panOf(p);
   const dur = kind === 'die' ? rand(.55, .8) : kind === 'hurt' ? rand(.22, .32) : rand(.9, 1.5);
   const f0 = kind === 'hurt' ? rand(150, 190) : kind === 'die' ? rand(120, 150) : rand(78, 115);
@@ -511,7 +536,7 @@ function turn(obj, target, dt, speed = 10){
 /* ================= Cena ================= */
 let renderer, scene, camera, effect, root, world, house, HS = 1, GS = 1, mindar = null, anchor = null;
 let AR = false, tracking = false;   // AR: false | 'mind' (adesivo) | 'xr' (WebXR, fixo na mesa); tracking = jogo posicionado
-const BASE_AR = .085, BASE_XR = .021;
+const BASE_AR = .085, BASE_XR = .014;
 /* Trava no lugar: o adesivo posiciona uma vez; depois o giroscópio mantém o jogo parado no mundo */
 const poseM = new THREE.Matrix4(), lockM = new THREE.Matrix4(), qLock = new THREE.Quaternion(), devQ = new THREE.Quaternion();
 let hasGyro = false, seeing = false, xrHit = null, reticle = null;
@@ -900,11 +925,11 @@ function setupScene(){
 }
 function applyScale(){
   if(!root) return;
-  root.scale.setScalar((AR === 'mind' ? BASE_AR : AR === 'slam' ? SL.unit*.036 : PLACE(AR) ? BASE_XR : 1)*GS);
+  root.scale.setScalar((AR === 'mind' ? BASE_AR : AR === 'slam' ? SL.unit*.022 : PLACE(AR) ? BASE_XR : 1)*GS);
   house.scale.setScalar(HS);
   $('oGame').textContent = Math.round(GS*100) + '%'; $('oHouse').textContent = Math.round(HS*100) + '%';
 }
-GS = clamp(parseFloat(LS.get('zgs')) || 1, .3, 3); HS = clamp(parseFloat(LS.get('zhs')) || 1, .7, 1.5);
+GS = clamp(parseFloat(LS.get('zgs')) || 1, .15, 3); HS = clamp(parseFloat(LS.get('zhs')) || 1, .7, 1.5);
 $('sGame').value = Math.round(GS*100); $('sHouse').value = Math.round(HS*100);
 $('sGame').addEventListener('input', e => { GS = e.target.value/100; LS.set('zgs', GS); applyScale(); });
 $('sHouse').addEventListener('input', e => { HS = e.target.value/100; LS.set('zhs', HS); applyScale(); });
@@ -954,7 +979,7 @@ function updateIntro(dt){
   }
   if(c.resIn && !c.closed){ door.rotation.y = Math.max(0, door.rotation.y - dt*3); if(door.rotation.y <= 0){ c.closed = t; } }
   if(c.ride){ const k = t - c.ride; c.moto.position.x = stopX + k*k*2.2; if(c.moto.position.x > 7.6){ c.moto.visible = false; engineOn(false); } }
-  if(c.closed && !c.smell){ c.smell = t; banner('Os zumbis sentiram o cheiro da pizza!', 'Proteja a casa', 'slime'); groan(); }
+  if(c.closed && !c.smell){ c.smell = t; banner('Os zumbis sentiram o cheiro da pizza!', 'Proteja a casa', 'slime'); groan(V(-3, 0, 0), 'groan', TYPES.gigante); setTimeout(() => groan(V(3, 0, 0), 'groan', TYPES.zumbi), 700); }
   if(c.smell){ c.sT = (c.sT || 0) - dt; if(c.sT <= 0 && t < c.smell + 2.4){ c.sT = .16;
       const src = pick([chimneyTop.clone().multiplyScalar(HS), ...ENTRIES.map(e => V(e.p.x*.8, 1.0, e.p.z*.8).multiplyScalar(HS))]); stink(src); } }
   if(c.smell && t > c.smell + 2.6) endIntro();
@@ -1042,7 +1067,7 @@ function spawn(typeKey, fromGrave){
   A.play('Spawn_Ground_Skeletons', {once:true, fade:0});
   world.add(A.g); ZS.push(Z);
   puffs(pos.clone().setY(.1), 0x8a6a48, 6, .22, .6);
-  if(Math.random() < .3) groan(pos);
+  if(Math.random() < .35) groan(pos, 'groan', T);
   if(T.hp > 1){ Z.bar = hpBar(); A.g.add(Z.bar); Z.bar.position.y = T.h + .35; drawBar(Z); }
   return Z;
 }
@@ -1096,7 +1121,7 @@ function updateZombie(Z, dt){
 function startSeg(Z){ const s = Z.segs[Z.si]; if(!Z.segStart) Z.segStart = Z.pos.clone(); Z.A.play(s.anim, {ts:s.ts, once:!!s.once, restart:!!s.once}); }
 function arrive(Z){
   Z.t = 0;
-  if(Z.final === 'break'){ Z.state = 'break'; Z.breakT = 0; Z.A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); if(Math.random() < .5) groan(Z.pos); }
+  if(Z.final === 'break'){ Z.state = 'break'; Z.breakT = 0; Z.A.play('Unarmed_Melee_Attack_Punch_A', {ts:1.2}); if(Math.random() < .6) groan(Z.pos, 'groan', Z.T); }
   else { Z.state = 'chimney'; loseLife(Z, 'Entrou pela chaminé!'); }
 }
 function enterHouse(Z){ Z.state = 'enter'; Z.t = 0; loseLife(Z, 'Um zumbi entrou na casa!'); puffs(Z.pos.clone().setY(.6), 0xc39a6b, 8, .18); }
@@ -1115,13 +1140,13 @@ function damage(Z, dmg, from){
   Z.hp -= dmg; Z.squash = 1;
   if(Z.bar) drawBar(Z);
   if(Z.hp <= 0) return kill(Z);
-  groan(Z.pos, 'hurt'); sample('acerto', .5, rand(.8, 1.1), panOf(Z.pos), .15);
+  groan(Z.pos, 'hurt', Z.T); sample('acerto', .5, rand(.8, 1.1), panOf(Z.pos), .15);
   if(Z.pos.y < .05 && Z.state !== 'break'){ const away = Z.pos.clone().sub(from).setY(0); if(away.lengthSq() > 1e-4){ away.normalize().multiplyScalar(.35); Z.pos.add(away); Z.A.g.position.copy(Z.pos); } }
   if(Z.state !== 'hit'){ Z.prev = Z.state; } Z.state = 'hit'; Z.hitT = .35; Z.A.play('Hit_A', {once:true, restart:true, fade:.05});
 }
 function kill(Z){
   const wasHigh = Z.pos.y > .05;
-  Z.state = 'dead'; Z.t = 0; Z.hy = 0; groan(Z.pos, 'die'); sample('impacto', .45, rand(.9, 1.15), panOf(Z.pos), .2);
+  Z.state = 'dead'; Z.t = 0; Z.hy = 0; groan(Z.pos, 'die', Z.T); sample('impacto', .45, rand(.9, 1.15), panOf(Z.pos), .2);
   if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; }
   Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true, fade:.08});
   if(wasHigh){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; }
@@ -1194,6 +1219,8 @@ function director(dt){
   const ramp = Math.min(1, G.score/GOAL), alive = ZS.filter(z => z.state !== 'dead').length;
   for(const [k, T] of Object.entries(TYPES)){ if(T.from > 0 && G.score >= T.from && !G.seen[k]){ G.seen[k] = true; banner('Cuidado!', 'Chegaram os ' + T.label.toLowerCase(), 'slime'); spawn(k); } }
   G.next -= dt; G.horde -= dt;
+  G.gT = (G.gT == null ? 2 : G.gT) - dt;   // a horda geme de vez em quando
+  if(G.gT <= 0){ G.gT = rand(1.4, 3.2); const w = ZS.filter(z => z.state === 'move' || z.state === 'break'); if(w.length){ const z = pick(w); groan(z.pos, 'groan', z.T); } }
   const interval = 2.5 - 1.75*ramp, maxAlive = 4 + Math.round(10*ramp);
   if(G.next <= 0 && alive < maxAlive){ spawn(pickType()); G.next = interval*rand(.6, 1.3); }
   if(G.horde <= 0){ G.horde = rand(34, 44); const n = 3 + Math.round(ramp*5); banner('Horda de zumbis!', n + ' zumbis ao mesmo tempo', 'slime'); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
@@ -1223,7 +1250,7 @@ function gameOver(won){
     banner('Os zumbis comeram a pizza!', 'Tente de novo', 'slime');
     ZS.forEach(Z => { if(Z.state === 'move' || Z.state === 'break' || Z.state === 'hit'){ Z.state = 'party'; Z.A.play(Math.random() < .5 ? 'Cheer' : 'Taunt'); } });
     music(null); tone('sawtooth', 233, 220, .45, .12, 0); tone('sawtooth', 220, 208, .45, .12, .5); tone('sawtooth', 208, 196, .45, .12, 1.0); tone('sawtooth', 196, 150, 1.3, .12, 1.5);
-    groan(V(-2, 0, 0)); setTimeout(() => groan(V(2, 0, 0)), 350);
+    groan(V(-2, 0, 0), 'groan', TYPES.zumbi); setTimeout(() => groan(V(2, 0, 0), 'groan', TYPES.gigante), 450);
   }
 }
 function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; } Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true}); if(Z.pos.y > .05){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; } }
@@ -1264,10 +1291,10 @@ touchEl.addEventListener('pointerdown', e => {
 touchEl.addEventListener('pointermove', e => {
   if(!AR && e.pointerType === 'mouse' && !ptrs.size) setAim3D(e.clientX, e.clientY);
   const p = ptrs.get(e.pointerId); if(!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-  if(ptrs.size === 2 && pinch0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
+  if(ptrs.size === 2 && pinch0 && !tp0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
     let da = Math.atan2(b.y - a.y, b.x - a.x) - pinch0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
     world.rotation.y = pinch0.ry - da;
-    if(AR){ GS = clamp(pinch0.gs*r, .3, 3); $('sGame').value = Math.round(GS*100); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 8, 30); return; }
+    if(AR){ GS = clamp(pinch0.gs*r, .15, 3); $('sGame').value = Math.round(GS*100); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 8, 30); return; }
   if(!AR && ptrs.size === 1){ orbit.az -= dx*.008; orbit.el = clamp(orbit.el + dy*.006, .18, 1.35); }
 });
 function endPtr(e){
@@ -1283,8 +1310,20 @@ function endPtr(e){
   }
 }
 touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; if(!ptrs.size) multi = false; });
-touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .3, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 8, 30); }, {passive:false});
+touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .15, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 8, 30); }, {passive:false});
 function setAim3D(x, y){ aimNDC.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); const c = $('cross'); c.style.left = x + 'px'; c.style.top = y + 'px'; }
+/* iPhone: o Safari usa a pinça para dar zoom na página; aqui ela vai para o jogo */
+['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive:false}));
+let tp0 = null;
+function twoTouch(e){ const [a, b] = [e.touches[0], e.touches[1]]; return {d:Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY), ang:Math.atan2(b.clientY - a.clientY, b.clientX - a.clientX)}; }
+touchEl.addEventListener('touchstart', e => { if(e.touches.length === 2){ e.preventDefault(); multi = true; const g = twoTouch(e); tp0 = {d:g.d, ang:g.ang, gs:GS, ry:world.rotation.y, dist:orbit.dist}; pinch0 = null; } }, {passive:false});
+touchEl.addEventListener('touchmove', e => {
+  if(e.touches.length !== 2 || !tp0) return; e.preventDefault();
+  const g = twoTouch(e), r = g.d/Math.max(1, tp0.d); let da = g.ang - tp0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+  world.rotation.y = tp0.ry - da;
+  if(AR){ GS = clamp(tp0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(tp0.dist/r, 8, 30);
+}, {passive:false});
+touchEl.addEventListener('touchend', e => { if(e.touches.length < 2) tp0 = null; }, {passive:true});
 let holdFire = null;
 $('fire').addEventListener('pointerdown', e => { e.preventDefault(); audio(); fire(aimNDC); clearInterval(holdFire); holdFire = setInterval(() => fire(aimNDC), 90); });
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => $('fire').addEventListener(t, () => clearInterval(holdFire)));
