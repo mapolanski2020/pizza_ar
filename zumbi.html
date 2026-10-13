@@ -67,6 +67,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--crust);outline-
 .banner b{display:block;font-family:var(--display);font-weight:400;font-size:clamp(26px,7vw,40px);line-height:1.1;color:var(--crust);text-shadow:0 3px 0 #5a2c18,0 6px 16px rgba(0,0,0,.7)}
 .banner span{display:block;margin-top:6px;font-weight:800;font-size:15px;text-shadow:0 2px 8px rgba(0,0,0,.9)}
 .banner.show{animation:bannerIn 2.4s ease forwards}
+.banner.win b{font-size:clamp(44px,13vw,72px);background:linear-gradient(90deg,#ff5a3c,#ffd34d,#8fd14f,#4fb3ff,#ff7aa8);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 4px 0 #5a2c18) drop-shadow(0 8px 14px rgba(0,0,0,.6))}
+.banner.win.show{animation:winIn 7s ease forwards}
+@keyframes winIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-8deg)}8%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(3deg)}14%{transform:translate(-50%,-50%) scale(1) rotate(0)}20%,40%,60%,80%{transform:translate(-50%,-50%) scale(1.06)}30%,50%,70%{transform:translate(-50%,-50%) scale(1)}90%{opacity:1}100%{opacity:0}}
 .banner.slime b{color:var(--slime);text-shadow:0 3px 0 #2c4a17,0 6px 16px rgba(0,0,0,.7)}
 @keyframes bannerIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.6)}12%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}20%{transform:translate(-50%,-50%) scale(1)}80%{opacity:1}100%{opacity:0}}
 .pop{position:fixed;transform:translate(-50%,-50%);font-weight:800;font-size:20px;color:var(--crust);text-shadow:0 2px 6px rgba(0,0,0,.85);pointer-events:none;animation:rise 1s ease-out forwards;z-index:4;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -106,6 +109,7 @@ body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px va
 .sizer input[type=range]{width:100%;accent-color:var(--ember);height:28px}
 .screen{position:fixed;inset:0;z-index:6;display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto;background:radial-gradient(120% 80% at 50% 110%,#2f4a1c 0%,#1d2414 45%,var(--oven) 100%)}
 .screen.over{background:rgba(12,10,8,.62)}
+.screen.over.won{background:linear-gradient(transparent 35%,rgba(12,10,8,.55));place-items:end center}
 .panel{width:min(440px,100%);background:rgba(28,23,17,.95);border:1px solid var(--line);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 .eyebrow{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slime);font-weight:800}
 h1{margin:-6px 0 0;font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;color:var(--crust)}
@@ -662,6 +666,66 @@ function stink(from){
   const dir = V(from.x, 0, from.z).normalize().multiplyScalar(rand(1.5, 2.6)); if(!isFinite(dir.x)) dir.set(rand(-1, 1), 0, rand(-1, 1));
   fx(s, 2.6, (f, k, dt) => { s.position.addScaledVector(dir, dt); s.position.y += dt*.5; s.scale.set(.5*(1 + k), 1*(1 + k), 1); m.opacity = k < .2 ? k/.2 : 1 - (k - .2)/.8; m.rotation = Math.sin(f.t*4)*.3; });
 }
+/* ===== Festa da vitória: a família sai pulando, fogos, confete e o motoboy buzinando ===== */
+let party = null;
+const FW_COLORS = [0xff5a3c, 0xffd34d, 0x8fd14f, 0x4fb3ff, 0xff7aa8, 0xb57bff, 0xffffff];
+function firework(p){
+  const c = pick(FW_COLORS), c2 = pick(FW_COLORS);
+  const flash = new THREE.Mesh(sphereGeo, fxMat(0xffffff, .9)); flash.position.copy(p);
+  fx(flash, .25, (f, k) => { flash.scale.setScalar(.6*(1 - k) + .05); flash.material.opacity = .9*(1 - k); });
+  for(let i=0;i<34;i++){
+    const m = new THREE.Mesh(sphereGeo, fxMat(i%3 ? c : c2)); m.position.copy(p); m.scale.setScalar(.09);
+    const v = V(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(3, 4.2));
+    fx(m, 1.4, (f, k, dt) => { v.y -= 3.2*dt; v.multiplyScalar(1 - dt*1.6); m.position.addScaledVector(v, dt); m.scale.setScalar(.1*(1 - k*.8)); m.material.opacity = k < .7 ? 1 : (1 - k)/.3; });
+  }
+  if(AC && !muted){ tone('sine', rand(900, 1300), 300, .25, .08); setTimeout(() => boom(false), 120); }
+}
+function fanfare(){
+  const n = [[523, 0], [659, .14], [784, .28], [1046, .42], [784, .66], [1046, .8], [1318, 1.0]];
+  n.forEach(([f, t]) => { tone('square', f, 0, .2, .07, t); tone('triangle', f/2, 0, .24, .1, t); });
+  [[1046, 1.5], [1175, 1.65], [1318, 1.8], [1568, 2.0]].forEach(([f, t]) => tone('triangle', f, 0, .3, .12, t));
+}
+const beep = () => { tone('square', 740, 0, .12, .1); tone('square', 740, 0, .16, .1, .2); };
+function startParty(){
+  endParty();
+  door.rotation.y = 1.5;
+  const fam = [
+    {key:'Barbarian', h:1.05, x:-.95, z:1.15, box:true},
+    {key:'Mage', h:1.0, x:.95, z:1.15},
+    {key:'Rogue', h:.72, x:0, z:1.8}
+  ].map((m, i) => {
+    const A = actor(m.key, m.h, false); A.g.position.set(0, 0, d2*HS - .2); A.g.visible = false; world.add(A.g);
+    if(m.box){ const b = pizzaBox(); A.g.add(b); b.position.set(0, m.h*.95 + .1, .1); b.rotation.x = -.2; A.box = b; }
+    return {A, home:V(m.x, 0, d2*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h};
+  });
+  const moto = scooter(); moto.rotation.y = Math.PI/2; moto.position.set(-8, 0, 5.85); world.add(moto);
+  const rider = actor('Knight', 1.05, false); moto.add(rider.g); rider.g.position.set(0, .28, -.18); rider.shadow.visible = false; rider.play('Sit_Chair_Idle');
+  party = {t:0, fam, fwT:.2, cfT:0, moto, rider, beeped:false};
+  fanfare(); levelUp();
+}
+function updateParty(dt){
+  const P = party; P.t += dt; const t = P.t;
+  P.fam.forEach((m, i) => {
+    const A = m.A; A.mixer.update(dt);
+    if(t < m.out) return;
+    A.g.visible = true;
+    if(!m.arrived){ if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; } return; }
+    // pula e comemora sem parar, cada um no seu ritmo
+    const k = (t*1.6 + m.ph) % 2;
+    if(k < 1){ A.play('Jump_Full_Short', {ts:1.3}); A.g.position.y = Math.sin(k*Math.PI)*.55*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(k*Math.PI)*.4)); }
+    else { A.play('Cheer'); A.g.position.y = 0; }
+    A.g.rotation.y = Math.sin(t*2 + i)*.35;
+    if(A.box) A.box.rotation.y += dt*4;
+  });
+  P.fwT -= dt; if(P.fwT <= 0){ P.fwT = rand(.25, .55); firework(V(rand(-4.5, 4.5), rand(3.8, 6.5), rand(-3.5, 2.5))); }
+  P.cfT -= dt; if(P.cfT <= 0){ P.cfT = 1.6; confetti(V(-2.2, .8, d2*HS + 1)); confetti(V(2.2, .8, d2*HS + 1)); }
+  P.rider.mixer.update(dt);
+  if(t > 1.2){ P.moto.position.x = Math.min(9, -8 + (t - 1.2)*3.2); P.moto.position.y = Math.abs(Math.sin(t*14))*.02; if(!P.beeped && P.moto.position.x > -1){ P.beeped = true; beep(); } }
+}
+function endParty(){
+  if(!party) return;
+  party.fam.forEach(m => world.remove(m.A.g)); world.remove(party.moto); party = null;
+}
 function confetti(p){
   const cols = [0xff5a3c, 0xffd34d, 0x8fd14f, 0x4fb3ff, 0xff7aa8];
   for(let i=0;i<40;i++){ const c = new THREE.Mesh(cubeGeo, mat(pick(cols))); c.scale.set(.1, .02, .06); c.position.copy(p); const v = V(rand(-3, 3), rand(5, 9), rand(-3, 3));
@@ -1032,14 +1096,11 @@ function showPlayHUD(on){ $('hudB').hidden = !on; $('cross').hidden = !on; marke
 let endT = 0, endWon = false;
 function gameOver(won){
   if(mode !== 'play') return;
-  mode = 'ending'; endWon = won; endT = 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
+  mode = 'ending'; endWon = won; endT = won ? 8.5 : 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
   if(won){
-    banner('Casa salva!', '5.000 pontos: a pizza está a salvo');
+    banner('VITÓRIA!', 'Casa salva! A família vai comer a pizza', 'win');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
-    boom(true); door.rotation.y = 1.5;
-    const r = actor('Barbarian', 1.05, false); r.g.position.set(0, 0, d2*HS + .3); world.add(r.g); r.play('Cheer'); G.hero = r;
-    const bx = pizzaBox(); r.g.add(bx); bx.position.set(0, .62, .34);
-    confetti(V(0, 2, d2*HS)); levelUp();
+    boom(true); startParty();
   } else {
     banner('Os zumbis comeram a pizza!', 'Tente de novo', 'slime');
     ZS.forEach(Z => { if(Z.state === 'move' || Z.state === 'break' || Z.state === 'hit'){ Z.state = 'party'; Z.A.play(Math.random() < .5 ? 'Cheer' : 'Taunt'); } });
@@ -1064,9 +1125,10 @@ function showEnd(){
   if(!won) lines.unshift(['Faltaram', fmt(Math.max(0, GOAL - G.score)) + ' pontos']);
   $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
   $('eInfo').hidden = !info; $('eInfo').textContent = info; $('eInfo').className = 'info ' + (won ? 'good' : '');
+  $('end').classList.toggle('won', won);
   $('end').hidden = false; $('touch').hidden = true; $('hud').hidden = true; $('scan').hidden = true;
 }
-function cleanupEnd(){ if(G && G.hero){ world.remove(G.hero.g); G.hero = null; } door.rotation.y = 0; }
+function cleanupEnd(){ endParty(); door.rotation.y = 0; }
 $('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
 $('eMenu').addEventListener('click', () => { location.href = 'index.html'; });
 $('bQuit').addEventListener('click', () => { tutOff(); if(cast) endIntro(); engineOn(false); cleanupEnd(); ZS.slice().forEach(removeZ); mode = 'menu'; G = null;
@@ -1243,7 +1305,6 @@ function loop(time, frame){
       for(const Z of ZS.slice()){ if(Z.state === 'party'){ Z.A.mixer.update(dt); continue; } updateZombie(Z, dt); }
       ENTRIES.forEach(e => { if(e.door) e.obj.rotation.y = e.attack ? Math.sin(G.t*30)*.08 : 0; else e.obj.rotation.z = e.attack ? Math.sin(G.t*32)*.07 : 0; });
       updateBombs(dt);
-      if(G.hero) G.hero.mixer.update(dt);
       if(mode === 'ending'){ endT -= dt; if(endT <= 0) showEnd(); }
     }
     if(mode === 'play'){
@@ -1255,6 +1316,7 @@ function loop(time, frame){
       else marker.visible = false;
       $('cross').classList.toggle('cool', coolT > 0);
     }
+    if(party) updateParty(dt);
     updateFX(dt);
     if(houseShake > 0){ houseShake = Math.max(0, houseShake - dt); house.position.set(Math.sin(now/18)*.06*houseShake*2, 0, Math.cos(now/23)*.05*houseShake*2); } else house.position.set(0, 0, 0);
     if(shake > 0){ shake = Math.max(0, shake - dt*.8); world.position.set(rand(-1, 1)*shake*.25, 0, rand(-1, 1)*shake*.25); } else world.position.set(0, 0, 0);
