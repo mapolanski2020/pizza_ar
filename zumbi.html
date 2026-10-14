@@ -245,6 +245,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { OutlineEffect } from 'three/addons/effects/OutlineEffect.js';
 import { clone as skClone } from 'three/addons/utils/SkeletonUtils.js';
+import { mergeBufferGeometries as mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 THREE.ColorManagement.enabled = true;
 const $ = id => document.getElementById(id);
@@ -267,13 +268,14 @@ let WEAPONS = [
   {name:'Chuva de Bombas', snd:'bomba4', kills:70, R:1.5, dmg:2, n:5, spread:1.7, cd:.6, color:0xf0b429, size:.16}
 ];
 let TYPES = {
-  zumbi:{label:'Zumbi', models:['Rogue','Mage','Barbarian','Knight'], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, from:0, w:5},
-  escalador:{label:'Zumbis escaladores', models:['Rogue','Barbarian'], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
-  esqueleto:{label:'Esqueletos corredores', models:['anims'], hp:1, pts:50, speed:1.15, h:1, walk:'Running_A', ts:.85, from:700, w:3, death:'Death_C_Skeletons'},
-  guerreiro:{label:'Esqueletos guerreiros', models:['Skeleton_Warrior'], hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', from:1500, w:2.2, death:'Death_C_Skeletons'},
-  ninja:{label:'Esqueletos ninja (sobem no telhado)', models:['Skeleton_Rogue'], hp:2, pts:100, strong:true, speed:1, h:1, walk:'Running_A', climb:true, from:2300, w:1.6, death:'Death_C_Skeletons'},
-  mago:{label:'Esqueletos magos (se teletransportam)', models:['Skeleton_Mage'], hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_D_Skeletons', blink:true, from:3000, w:1.5, death:'Death_C_Skeletons'},
-  gigante:{label:'Zumbis gigantes', models:['Knight'], zombie:true, hp:5, pts:100, strong:true, speed:.42, h:1.75, walk:'Walking_D_Skeletons', ts:.7, from:3800, w:1, breakT:1.5}
+  // cada tipo usa um dos bonecos do "Kit de Orda de Zumbis" (looks em LOOKS)
+  zumbi:{label:'Zumbi', models:['Rogue','Barbarian'], looks:[6, 7, 8], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, from:0, w:5},
+  escalador:{label:'Zumbis de boné (sobem no telhado)', models:['Rogue'], looks:[1], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
+  esqueleto:{label:'Zumbis corredores', models:['Rogue'], looks:[3], zombie:true, hp:1, pts:50, speed:1.15, h:.95, walk:'Running_A', ts:.85, from:700, w:3},
+  guerreiro:{label:'Zumbis mecânicos', models:['Barbarian'], looks:[2], zombie:true, hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', ts:.75, from:1500, w:2.2},
+  ninja:{label:'Zumbis ladrões (sobem no telhado)', models:['Rogue'], looks:[5], zombie:true, hp:2, pts:100, strong:true, speed:1, h:1, walk:'Running_A', ts:.8, climb:true, from:2300, w:1.6},
+  mago:{label:'Zumbis remendados (se teletransportam)', models:['Barbarian'], looks:[4], zombie:true, hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, blink:true, from:3000, w:1.5},
+  gigante:{label:'Zumbis gigantes', models:['Barbarian'], looks:[0], zombie:true, hp:5, pts:100, strong:true, speed:.42, h:1.75, walk:'Walking_D_Skeletons', ts:.6, from:3800, w:1, breakT:1.5}
 };
 
 /* ===== FASE 2: O Castelo da Pizza (invasores medievais, flechas, flechas de fogo e bombas) ===== */
@@ -643,6 +645,49 @@ const GRAD = (() => { const d = new Uint8Array([90, 170, 255]); const t = new TH
 const MATS = {};
 function mat(hex, extra){ const k = hex + (extra ? JSON.stringify(extra) : ''); return MATS[k] || (MATS[k] = new THREE.MeshToonMaterial(Object.assign({color:hex, gradientMap:GRAD}, extra || {}))); }
 const toonCache = new Map();
+const GLSL_NOISE = `
+  float zh(vec3 p){ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7)))*43758.5453); }
+  float zn(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f);
+    return mix(mix(mix(zh(i), zh(i + vec3(1,0,0)), f.x), mix(zh(i + vec3(0,1,0)), zh(i + vec3(1,1,0)), f.x), f.y),
+               mix(mix(zh(i + vec3(0,0,1)), zh(i + vec3(1,0,1)), f.x), mix(zh(i + vec3(0,1,1)), zh(i + vec3(1,1,1)), f.x), f.y), f.z); }`;
+const gv = c => { const k = new THREE.Color(c); return `vec3(${k.r.toFixed(3)},${k.g.toFixed(3)},${k.b.toFixed(3)})`; };
+/* Zumbi "vinil": pele verde-acinzentada com manchas e feridas; roupa recolorida com o padrão do boneco
+   (xadrez, listras, jeans, macacão), suja e com remendos. vO = posição do vértice no molde (não anima). */
+function toyMat(m, L, part, F){
+  const k = m.uuid + '|toy' + L.id + part;
+  if(toonCache.has(k)) return toonCache.get(k);
+  const t = new THREE.MeshToonMaterial({color:m.color, map:m.map, gradientMap:GRAD, side:m.side});
+  const arm = part === 'arm', leg = part === 'leg';
+  let cloth = gv(L.cloth), pat = '';
+  if(L.pat === 'plaid') pat = `float px = step(.72, fract(vO.x*${(F*1.6).toFixed(2)})), py = step(.72, fract(vO.y*${(F*1.6).toFixed(2)}));
+      cl = mix(cl, cl*.35, max(px, py)*.75); cl = mix(cl, vec3(.85,.8,.7), step(.94, fract(vO.x*${(F*1.6).toFixed(2)} + .1))*.5);`;
+  if(L.pat === 'stripes') pat = `cl = mix(cl, ${gv(L.c2)}, step(.5, fract(vO.y*${(F*1.4).toFixed(2)})));`;
+  if(L.pat === 'overall') pat = arm ? `cl = ${gv(L.c2)};` : '';
+  if(leg) pat = `cl = ${gv(L.pants || 0x2d3a52)};`;
+  if(part === 'head') pat = `cl = ${gv(L.hc)};`;
+  t.onBeforeCompile = sh => {
+    sh.vertexShader = 'varying vec3 vO;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vO = position;');
+    sh.fragmentShader = 'varying vec3 vO;\n' + GLSL_NOISE + '\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+      vec3 zc = diffuseColor.rgb;
+      float skin = step(.45, zc.r) * step(zc.b, .5*zc.r) * step(.5*zc.r, zc.g) * step(zc.g, .97*zc.r);
+      float lum = sqrt(dot(zc, vec3(.3, .59, .11)));   // ~brilho percebido
+      float n1 = zn(vO*${(F*1.2).toFixed(2)}), n2 = zn(vO*${(F*4.).toFixed(2)} + 7.);
+      // pele de vinil: verde-sálvia, manchas escuras e feridas avermelhadas
+      vec3 sk = ${gv(L.skin || 0x8c9c72)}*(.82 + .25*n2);
+      sk = mix(sk, sk*.62, smoothstep(.55, .75, n1));
+      sk = mix(sk, vec3(.42,.12,.09), smoothstep(.8, .86, zn(vO*${(F*2.2).toFixed(2)} + 3.)));
+      // roupa: cor do boneco, padrão, sujeira e remendos
+      vec3 cl = ${cloth};
+      ${pat}
+      cl *= .6 + .7*clamp(lum*1.5, 0., 1.);
+      cl = mix(cl, cl*vec3(.62,.55,.45), smoothstep(.5, .8, n1)*.8);
+      cl = mix(cl, vec3(.62,.5,.36)*(.8 + .3*n2), smoothstep(.86, .88, zn(vO*${(F*.7).toFixed(2)} + 11.))*.85);
+      cl = mix(cl, vec3(.035,.03,.025), step(lum, .1));
+      diffuseColor.rgb = ${part === 'beard' ? 'sk' : 'mix(cl, sk, skin)'};`);   // Barbarian: sem barba, vira queixo verde
+  };
+  t.customProgramCacheKey = () => 'toy' + L.id + part;
+  toonCache.set(k, t); return t;
+}
 function toonOf(m, zombie){
   const k = m.uuid + (zombie ? 'z' : '');
   if(toonCache.has(k)) return toonCache.get(k);
@@ -662,23 +707,27 @@ function toonOf(m, zombie){
 const manager = new THREE.LoadingManager();
 manager.onProgress = (u, a, b) => { $('loadFill').style.width = Math.round(a/b*100) + '%'; };
 const loader = new GLTFLoader(manager);
-const FILES = FASE === 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'Skeleton_Warrior', 'Skeleton_Mage', 'Skeleton_Rogue', 'props'];
+const FILES = FASE === 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props'];
 const GL = {};
 const KEEP = /Body|Arm|Leg|Head|Hat|Helmet|Cape|Cloak|Eyes|Jaw|Skull|Hood/;
 const TPL = {};
 const CLIPS = {};
 const PROPS = ['pumpkin', 'pumpkinS', 'grave', 'gravestone', 'deadTree', 'deadTreeM', 'lantern', 'postLantern', 'fence', 'pine', 'pineY', 'marker'];
-function template(key, zombie, bare, gear){
-  const k = key + (zombie ? '_z' : '') + (bare ? '_b' : '') + (gear ? '_g' + gear.join('+') : '');
+function template(key, zombie, bare, gear, look){
+  const L = look != null ? LOOKS[look] : null;
+  const k = key + (zombie ? '_z' : '') + (bare ? '_b' : '') + (gear ? '_g' + gear.join('+') : '') + (L ? '_L' + look : '');
   if(TPL[k]) return TPL[k];
   const s = skClone(GL[key].scene);
+  const b = new THREE.Box3();
   s.traverse(o => { if(o.isMesh){
     // inimigos ficam sem chapéu, capuz ou capacete: aparece a cabeça de zumbi / caveira
-    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare) && /Hat|Helmet|Hood(?!ed)/.test(o.name))) o.visible = false;
-    o.material = toonOf(o.material, zombie); o.frustumCulled = false;
+    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
+    o.frustumCulled = false;
+    if(o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); }
   } });
-  const b = new THREE.Box3(); s.traverse(o => { if(o.isMesh && o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); } });
-  const tpl = {scene:s, h:Math.max(.5, b.max.y - b.min.y)};
+  const gh = Math.max(.5, b.max.y - b.min.y);
+  s.traverse(o => { if(o.isMesh) o.material = L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
+  const tpl = {scene:s, h:gh};
   if(zombie){
     s.updateMatrixWorld(true);
     const headMesh = []; s.traverse(o => { if(o.isMesh && o.visible && /Head/.test(o.name) && !/Hood|Hat|Helmet/.test(o.name)) headMesh.push(o); });
@@ -692,8 +741,12 @@ function template(key, zombie, bare, gear){
       tpl.face = {
         eyes:[-1, 1].map(sx => toBone(V(c.x + sx*sz.x*.2, c.y + sz.y*.02, wb.max.z - sz.z*.05))),
         mouth:toBone(V(c.x, c.y - sz.y*.25, wb.max.z - sz.z*.08)),
-        r:sz.x*.1/bs
+        r:sz.x*.1/bs,
+        // referencial da cabeça alinhado ao boneco (y para cima, z para a frente), em unidades do modelo
+        frame:{pos:toBone(c), quat:bone.getWorldQuaternion(new THREE.Quaternion()).invert(), s:1/bs}, size:sz.clone()
       };
+      const hs = s.getObjectByName('handslotr');
+      if(hs) tpl.hand = {quat:hs.getWorldQuaternion(new THREE.Quaternion()).invert(), s:1/hs.getWorldScale(V()).x};
     }
   }
   return (TPL[k] = tpl);
@@ -727,9 +780,129 @@ function zombieFace(m, f){
   const mouth = new THREE.Mesh(sphereGeo, mouthMat); mouth.scale.set(r*2.3, r*.75, r*.45); mouth.position.copy(f.mouth); bone.add(mouth);
   [-1, 0, 1].forEach(k => { const t = new THREE.Mesh(cubeGeo, toothMat); t.scale.set(r*.42, r*.5, r*.2); t.position.copy(f.mouth); t.position.x += k*r*.7; t.position.y += r*.32; t.position.z += r*.3; bone.add(t); });
 }
-function actor(key, h, zombie, bare, gear){
-  const T = template(key, zombie, bare, gear), m = skClone(T.scene);
-  if(zombie && bare) zombieFace(m, T.face);
+/* ===== "Kit de Orda de Zumbis": bonecos estilo vinil (cabeção, olhos amarelos, cabelo espetado, roupa rasgada) ===== */
+const LOOKS = [
+  {hair:'spiky', hc:0x1b1b20, cloth:0x3d5f8c, pants:0x3a3632, wound:1},                          // 0 gigante: jaqueta jeans rasgada
+  {hair:'cap', hc:0x5b3a22, cap:0xb7a17c, cloth:0xa3302a, pat:'plaid', pants:0x3b3a37},            // 1 boné virado + camisa xadrez
+  {hair:'bandage', hc:0x8d908c, cloth:0x6b4a33, pants:0x3d3a35, prop:'wrench'},                    // 2 bandagem + colete marrom + chave inglesa
+  {hair:'pigtails', hc:0xcf7aa0, cloth:0x8f4a5f, pants:0x34507a, patch:1, prop:'bone', girl:1},    // 3 maria-chiquinha rosa + tapa-olho + osso
+  {hair:'spiky', hc:0x141418, cloth:0x35577f, c2:0x8b8f74, pat:'overall', pants:0x35577f, stitch:1, bolts:1},  // 4 macacão + pontos na testa
+  {hair:'spiky', hc:0x4f87bd, cloth:0x2e4c74, c2:0xc8b088, pat:'stripes', pants:0x3a3734, patch:0, prop:'sack'}, // 5 cabelo azul + suéter listrado + saco
+  {hair:'spiky', hc:0xe2662a, cloth:0x5d6641, pants:0x3a3734, wound:1},                            // 6 cabelo laranja + moletom verde
+  {hair:'spiky', hc:0x2b211a, cloth:0x6d6f72, pants:0x3c4c63, stitch:1},                          // 7 camiseta cinza
+  {hair:'spiky', hc:0xc9b56a, cloth:0x7a3b2a, pants:0x2f3d55, wound:1}                             // 8 loiro + camisa vinho
+];
+LOOKS.forEach((L, i) => L.id = i);
+const ballGeo = new THREE.SphereGeometry(1, 22, 16), capGeo = new THREE.SphereGeometry(1, 22, 12, 0, Math.PI*2, 0, Math.PI*.44);
+const spikeGeo = new THREE.ConeGeometry(1, 1, 7).translate(0, .5, 0), bandGeo = new THREE.CylinderGeometry(1, 1, 1, 24, 1, true);
+const discGeo = new THREE.CylinderGeometry(1, 1, 1, 20).rotateX(Math.PI/2), strapGeo = new THREE.TorusGeometry(1, .035, 6, 32);
+const toyBasic = {}; const tb = (c) => toyBasic[c] || (toyBasic[c] = Object.assign(new THREE.MeshBasicMaterial({color:c}), {userData:{outlineParameters:{visible:false}}}));
+const tt = (c, out = true) => { const m = mat(c); if(!out) m.userData.outlineParameters = {visible:false}; return m; };
+// junta as peças por material (poucas chamadas de desenho por zumbi, leve no celular)
+function bake(group){
+  const by = new Map();
+  group.children.forEach(o => { o.updateMatrix(); const g = o.geometry.index ? o.geometry.clone() : o.geometry.clone(); g.applyMatrix4(o.matrix); if(!by.has(o.material)) by.set(o.material, []); by.get(o.material).push(g); });
+  return [...by].map(([mt, gs]) => new THREE.Mesh(mergeGeometries(gs), mt));
+}
+function toyZombie(m, T, L){
+  const face = T.face, hand = T.hand;
+  const bone = m.getObjectByName('head'); if(!bone || !face || !face.frame) return;
+  bone.scale.multiplyScalar(1.14);   // cabeção de boneco de vinil
+  const F = new THREE.Group(); F.position.copy(face.frame.pos); F.quaternion.copy(face.frame.quat); F.scale.setScalar(face.frame.s); bone.add(F);
+  const S = face.size, hx = S.x/2, hy = S.y/2, hz = S.z/2, u = S.x;   // u = largura da cabeça
+  const add = (geo, mt, p, sc, r) => { const o = new THREE.Mesh(geo, mt); o.position.set(p[0], p[1], p[2]); if(sc.length) o.scale.set(sc[0], sc[1], sc[2]); else o.scale.setScalar(sc); if(r) o.rotation.set(r[0], r[1], r[2]); F.add(o); return o; };
+  if(!T.toyH){
+  const skin = tt(L.skin || 0x8c9c72), skinD = tt(0x5e6b4c, false);
+  const zf = hz*.93;
+  // orelhas de abano
+  [-1, 1].forEach(sx => add(ballGeo, skin, [sx*hx*.98, -hy*.02, -hz*.05], [u*.07, u*.14, u*.1], [0, 0, sx*.3]));
+  // olhos: olheira escura, globo amarelo-âmbar enorme, pupila pequena e um brilho
+  [-1, 1].forEach((sx, i) => {
+    const ex = sx*u*.21, ey = hy*.06;
+    if(L.patch === i){
+      add(discGeo, tt(0x4a2e1d), [ex, ey, zf + u*.01], [u*.17, u*.15, u*.05]);
+      [.7, -.7].forEach(a => add(cubeGeo, tb(0xd9c7a0), [ex, ey, zf + u*.04], [u*.2, u*.018, u*.01], [0, 0, a]));
+      const st = add(strapGeo, tt(0x3a2416, false), [0, ey + hy*.12, -hz*.05], [hx*1.05, hz*1.08, u*1.4], [Math.PI/2, 0, 0]); st.rotation.z = sx*.25; st.rotation.x = Math.PI/2 - sx*.22;
+      return;
+    }
+    add(ballGeo, tb(0x232b1c), [ex, ey - u*.015, zf - u*.03], [u*.19, u*.18, u*.08]);
+    add(ballGeo, tb(0xe3b64e), [ex, ey, zf], [u*.155, u*.15, u*.07]);
+    add(ballGeo, tb(0xf3dc8a), [ex, ey + u*.01, zf + u*.012], [u*.11, u*.105, u*.065]);
+    add(ballGeo, tb(0x1a1208), [ex + sx*-.01*u, ey, zf + u*.05], [u*.045, u*.045, u*.03]);
+    add(ballGeo, tb(0xffffff), [ex + u*.04, ey + u*.05, zf + u*.07], u*.018);
+    // sobrancelha franzida (cara de bravo)
+    add(cubeGeo, skinD, [ex, ey + u*.16, zf + u*.03], [u*.24, u*.05, u*.06], [0, 0, sx*.32]);
+  });
+  // nariz de caveira: duas narinas
+  [-1, 1].forEach(sx => add(ballGeo, tb(0x1c2414), [sx*u*.035, -hy*.12, zf + u*.04], [u*.025, u*.035, u*.02]));
+  // boca torta aberta com dentes tortos e amarelados
+  const my = -hy*.36, mt = L.girl ? .45 : 1;
+  add(ballGeo, tb(0x24100c), [0, my, zf - u*.01], [u*.24*(L.girl ? .6 : 1), u*.07*mt + u*.02, u*.06], [0, 0, .06]);
+  const teeth = L.girl ? [-.05, .05] : [-.17, -.09, -.01, .08, .16];
+  teeth.forEach((x, j) => { if(!L.girl && j === 2 && Math.random() < .5) return;
+    const t = add(cubeGeo, tb(j % 2 ? 0xe2d6a8 : 0xd4c48c), [x*u, my + u*.035, zf + u*.035], [u*.06, u*(.06 + Math.random()*.04), u*.03], [0, 0, rand(-.25, .25)]); });
+  if(!L.girl) [-.12, .13].forEach(x => add(spikeGeo, tb(0xe2d6a8), [x*u, my - u*.05, zf + u*.03], [u*.025, u*.07, u*.02]));
+  // pontos de costura, feridas e parafusos
+  if(L.stitch){ add(cubeGeo, tb(0x2a1a14), [-u*.05, hy*.62, zf - u*.02], [u*.42, u*.022, u*.02], [0, 0, -.12]);
+    for(let i=0;i<5;i++) add(cubeGeo, tb(0x2a1a14), [-u*.23 + i*u*.09, hy*.62 + u*.02 - i*u*.011, zf], [u*.018, u*.08, u*.02], [0, 0, .2]); }
+  if(L.wound){ add(ballGeo, tb(0x7a2219), [u*.3, hy*.45, zf - u*.07], [u*.06, u*.08, u*.03]); add(ballGeo, tb(0x4c1410), [-u*.33, -hy*.2, zf - u*.09], [u*.045, u*.05, u*.03]);
+    for(let i=0;i<3;i++) add(cubeGeo, tb(0x2a1a14), [-u*.35 + i*u*.03, -hy*.05 - i*u*.03, zf - u*.06], [u*.012, u*.07, u*.02], [0, 0, 1.1]); }
+  if(L.bolts) [-1, 1].forEach(sx => add(discGeo, tt(0x6f6f73), [sx*hx*1.02, -hy*.55, -hz*.1], [u*.05, u*.05, u*.12], [0, Math.PI/2, 0]));
+  // cabelo
+  const hair = tt(L.hc);
+  const scalp = (k = 1.04) => add(capGeo, hair, [0, -hy*.02, -hz*.04], [hx*k, hy*1.02, hz*k*1.02]);
+  const spikes = (n, from, to, len, front) => {
+    for(let i=0;i<n;i++){
+      const th = rand(from, to), ph = Math.random()*Math.PI*2;
+      if(!front && Math.sin(ph) > .55 && th > .55) continue;   // não cobre a testa
+      const d = V(Math.sin(th)*Math.cos(ph), Math.cos(th), Math.sin(th)*Math.sin(ph));
+      const p = V(d.x*hx*.92, d.y*hy*.95, d.z*hz*.92);
+      const o = add(spikeGeo, hair, [p.x, p.y, p.z], [u*rand(.07, .11), u*rand(len*.7, len*1.15), u*rand(.07, .11)]);
+      const dir = d.clone(); dir.y += .55; dir.normalize(); dir.x += rand(-.25, .25); dir.z += rand(-.25, .25); dir.normalize();
+      o.quaternion.setFromUnitVectors(V(0, 1, 0), dir);
+    }
+    if(front) for(let i=0;i<5;i++){   // franja espetada caindo na testa
+      const x = (i - 2)*hx*.32, o = add(spikeGeo, hair, [x, hy*.55, hz*.75], [u*.08, u*rand(.18, .26), u*.07]);
+      o.quaternion.setFromUnitVectors(V(0, 1, 0), V(x*.6/hx + rand(-.2, .2), -.85, .55).normalize());
+    }
+  };
+  if(L.hair === 'spiky'){ scalp(); spikes(26, 0, 1.2, .3, true); }
+  if(L.hair === 'bandage'){ scalp(); spikes(16, 0, .9, .22, false);
+    add(bandGeo, tt(0xe3d7b8), [0, hy*.42, 0], [hx*1.08, hy*.36, hz*1.1], [-.08, 0, .04]);
+    add(ballGeo, tb(0x8a3a24), [u*.18, hy*.5, hz*1.05], [u*.06, u*.04, u*.02]);
+    [-.3, .1].forEach(y => add(bandGeo, tt(0xd2c4a2), [0, hy*(.42 + y*.4), 0], [hx*1.1, hy*.04, hz*1.12], [-.08, 0, .04 + y*.2])); }
+  if(L.hair === 'pigtails'){ scalp(1.05);
+    for(let i=0;i<5;i++){ const x = (i - 2)*hx*.3, o = add(spikeGeo, hair, [x, hy*.6, hz*.72], [u*.09, u*.2, u*.07]); o.quaternion.setFromUnitVectors(V(0, 1, 0), V(x*.5/hx, -.9, .45).normalize()); }
+    [-1, 1].forEach(sx => { add(ballGeo, tt(0x3b2a33), [sx*hx*.9, hy*.62, -hz*.15], u*.06);
+      for(let i=0;i<7;i++){ const o = add(spikeGeo, hair, [sx*hx*.92, hy*.62, -hz*.15], [u*.08, u*rand(.38, .55), u*.07]);
+        o.quaternion.setFromUnitVectors(V(0, 1, 0), V(sx*rand(.6, 1), rand(-.1, .9), rand(-.5, .3)).normalize()); } }); }
+  if(L.hair === 'cap'){
+    add(capGeo, tt(L.cap), [0, hy*.02, -hz*.03], [hx*1.1, hy*1.04, hz*1.1]);
+    add(cubeGeo, tt(L.cap), [0, hy*.38, -hz*1.15], [u*.62, u*.04, u*.42], [-.25, 0, 0]);
+    add(ballGeo, tt(0x6d5a3e), [0, hy*1.04, -hz*.03], u*.05);
+    add(cubeGeo, tt(0x4a3a28), [0, hy*.5, -hz*.96], [u*.36, u*.12, u*.05]);   // regulador
+    add(discGeo, tb(0x9aa0a6), [u*.24, hy*.55, hz*.78], [u*.05, u*.05, u*.02], [0, .5, 0]);   // alfinete
+    for(let i=0;i<6;i++){ const x = (i - 2.5)*hx*.28, o = add(spikeGeo, tt(L.hc), [x, hy*.35, hz*.86], [u*.07, u*rand(.12, .2), u*.06]); o.quaternion.setFromUnitVectors(V(0, 1, 0), V(x*.4/hx, -1, .4).normalize()); } }
+  T.toyH = bake(F); F.clear(); }
+  T.toyH.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
+  // acessório na mão
+  const hs = m.getObjectByName('handslotr');
+  if(L.prop && hs && hand){
+    const P = new THREE.Group(); P.quaternion.copy(hand.quat); P.scale.setScalar(hand.s); hs.add(P);
+    const pa = (geo, mt, p, sc, r) => { const o = new THREE.Mesh(geo, mt); o.position.set(...p); o.scale.set(...sc); if(r) o.rotation.set(...r); P.add(o); return o; };
+    const k = u*(L.prop === 'sack' ? .7 : .9);
+    if(!T.toyP){
+    if(L.prop === 'wrench'){ const ir = tt(0x7c5a3c); pa(cubeGeo, ir, [0, k*.2, 0], [k*.09, k*.75, k*.05]); pa(cubeGeo, ir, [-k*.07, k*.62, 0], [k*.08, k*.16, k*.06]); pa(cubeGeo, ir, [k*.07, k*.64, 0], [k*.08, k*.2, k*.06]); pa(cubeGeo, ir, [0, k*.54, 0], [k*.22, k*.08, k*.06]); }
+    if(L.prop === 'bone'){ const bm = tt(0xe8dcc0); pa(new THREE.CylinderGeometry(1, 1, 1, 8), bm, [0, k*.15, 0], [k*.05, k*.55, k*.05]); [[-1, -.12], [1, -.12], [-1, .42], [1, .42]].forEach(([sx, y]) => pa(ballGeo, bm, [sx*k*.05, k*y, 0], [k*.07, k*.07, k*.07])); }
+    if(L.prop === 'sack'){ const sm = tt(0xa07a4e); pa(ballGeo, sm, [0, -k*.3, k*.05], [k*.3, k*.32, k*.26]); pa(spikeGeo, sm, [0, -k*.08, k*.05], [k*.1, k*.18, k*.1]); pa(discGeo, tb(0x2a1a10), [0, -k*.3, k*.3], [k*.1, k*.1, k*.01]); }
+    T.toyP = bake(P); P.clear(); }
+    T.toyP.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; P.add(o); });
+  }
+}
+function actor(key, h, zombie, bare, gear, look){
+  const T = template(key, zombie, bare, gear, look), m = skClone(T.scene);
+  if(look != null) toyZombie(m, T, LOOKS[look]);
+  else if(zombie && bare) zombieFace(m, T.face);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
   const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .06; sh.scale.setScalar(h); g.add(sh);
@@ -1342,7 +1515,7 @@ $('skip').addEventListener('click', () => { if(cast){ if(!cast.smell) banner(W.O
 /* ===== Zumbis ===== */
 function spawn(typeKey, fromGrave){
   const T = TYPES[typeKey]; const key = pick(T.models);
-  const A = FASE === 2 ? actor(key, T.h, false, false, T.gear) : actor(key, T.h, !!T.zombie, true);
+  const A = FASE === 2 ? actor(key, T.h, false, false, T.gear) : actor(key, T.h, !!T.zombie, true, null, T.looks ? pick(T.looks) : null);
   let pos;
   if(GRAVES.length && (fromGrave || (!T.climb && Math.random() < .35))){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
   else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
@@ -1829,7 +2002,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {get owner(){ return OWNER; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {get owner(){ return OWNER; }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
