@@ -933,7 +933,7 @@ function buildHouse(){
 }
 
 const glowMat = new THREE.MeshBasicMaterial({color:0xffb030, transparent:true, opacity:.16, depthWrite:false, blending:THREE.AdditiveBlending}); glowMat.userData.outlineParameters = {visible:false};
-function glowAt(o, sc){ const g = new THREE.Mesh(sphereGeo, glowMat); g.scale.setScalar(sc*.95); g.position.set(o.position.x, sc*.62, o.position.z); world.add(g); }
+function glowAt(o, sc){ const g = new THREE.Mesh(sphereGeo, glowMat); g.scale.setScalar(sc*.95); g.position.set(o.position.x, sc*.62, o.position.z); world.add(g); return g; }
 /* ===== Castelo (fase 2): torre do rei no centro, muralha quadrada com portões e torres nos cantos ===== */
 const LC = 3.0, WALLH = 1.25;
 const PROPS2 = ['castle', 'tower', 'wall', 'gate', 'ladder', 'tent', 'flag', 'treesA', 'treesB', 'rock', 'barrel', 'rack', 'crate', 'target', 'tree'];
@@ -981,7 +981,7 @@ function buildProps(){
   propAt('pine', -7.6, 2.4, .32, .3); propAt('pineY', 7.7, 2.9, .38, 1.2); propAt('pine', -3.3, -8.3, .27, 2);
   propAt('fence', -3.4, -8.2, .33, 0); propAt('fence', 4.2, -7.9, .33, -.2);
   [[-1.5, d2 + .8, .4], [1.5, d2 + .8, .38], [-1.6, d2 + 2.4, .44], [1.6, d2 + 2.4, .42]]
-    .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); glowAt(o, sc); });
+    .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); POSTS.push(o, glowAt(o, sc)); });
   POSTS.push(propAt('postLantern', -1.0, 4.6, .5, Math.PI), propAt('postLantern', 1.0, 4.6, .5, 0));
   propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
 }
@@ -1094,7 +1094,7 @@ function startParty(){
     {key:'Rogue', h:.72, x:0, z:1.8}
   ].map((m, i) => {
     const A = actor(m.key, m.h, false); A.g.position.set(0, 0, FZ*HS - .2); A.g.visible = false; world.add(A.g);
-    if(m.box){ const b = pizzaBox(); A.g.add(b); b.position.set(0, m.h*.95 + .1, .1); b.rotation.x = -.2; A.box = b; }
+    if(m.box){ const b = pizzaBox(); A.g.add(b); b.position.set(0, m.h*.4, .4); b.scale.setScalar(.85); A.box = b; }   // a pizza nas mãos, na altura do peito
     return {A, home:V(m.x, 0, FZ*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h, voice:['pai', 'mae', 'filho'][i], yell:0};
   });
   party = {t:0, fam, fwT:.2, cfT:0};
@@ -1111,15 +1111,12 @@ function updateParty(dt){
     A.g.visible = true;
     if(!m.arrived){ if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); cheerVoice(m.voice, A.g.position); }
       if(moveTo(A, m.home, 2.2, dt, 'Running_A')){ m.arrived = true; A.g.rotation.y = 0; } return; }
-    // "Ehhhhh!": grita e dá um pulão de alegria
-    if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); m.big = .9; cheerVoice(m.voice, A.g.position); }
-    if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.9; A.play('Jump_Full_Short', {ts:1.1}); A.g.position.y = Math.sin(q*Math.PI)*1.05*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.5)); A.g.rotation.y = 0; if(A.box) A.box.rotation.y += dt*8; return; }
-    // pula e comemora sem parar, cada um no seu ritmo
-    const k = (t*1.6 + m.ph) % 2;
-    if(k < 1){ A.play('Jump_Full_Short', {ts:1.3}); A.g.position.y = Math.sin(k*Math.PI)*.55*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(k*Math.PI)*.4)); }
-    else { A.play('Cheer'); A.g.position.y = 0; }
-    A.g.rotation.y = Math.sin(t*2 + i)*.35;
-    if(A.box) A.box.rotation.y += dt*4;
+    // comemoração de adulto: braços para cima (quem não está com a pizza) e um pulinho só na hora do grito
+    if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); m.big = .55; cheerVoice(m.voice, A.g.position); }
+    A.play(A.box ? 'Idle' : 'Cheer', {ts:A.box ? 1 : .8});
+    if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.55; A.g.position.y = Math.sin(q*Math.PI)*(A.box ? .15 : .28)*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.25)); }
+    else { A.g.position.y = 0; A.shadow.scale.setScalar(m.h); }
+    A.g.rotation.y = Math.sin(t*1.1 + i*1.7)*.12;
   });
   P.fwT -= dt; if(P.fwT <= 0){ P.fwT = rand(.25, .55); firework(V(rand(-4.5, 4.5), rand(3.8, 6.5), rand(-3.5, 2.5))); }
   P.cfT -= dt; if(P.cfT <= 0){ P.cfT = 1.6; confetti(V(-2.2, .8, FZ*HS + 1)); confetti(V(2.2, .8, FZ*HS + 1)); }
