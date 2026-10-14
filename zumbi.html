@@ -1648,6 +1648,13 @@ $('bQuit').addEventListener('click', () => { tutOff(); music(null); if(cast) end
 /* ================= Entrada (toque, mira, pinça, giro no modo sem câmera) ================= */
 const touchEl = $('touch'), ptrs = new Map();
 let orbit = {az:.35, el:.72, dist:24}, pinch0 = null, drag = null, multi = false;
+function fitDist(){ const asp = innerWidth/innerHeight, v = (camera ? camera.fov : 48)*Math.PI/360, h = Math.atan(Math.tan(v)*asp); return 10.2/Math.tan(Math.min(v, h)); }
+const ZMIN = 4, zmax = () => Math.max(30, fitDist()*1.15);
+function zoomTo(d){ orbit.dist = clamp(d, ZMIN, zmax()); }
+function pan(dx, dy){ // arrastar com dois dedos: move a vista sobre o tabuleiro
+  const k = orbit.dist/innerHeight*1.2, ca = Math.cos(orbit.az), sa = Math.sin(orbit.az);
+  camTarget.x = clamp(camTarget.x - (dx*ca + dy*sa)*k, -9, 9); camTarget.z = clamp(camTarget.z - (-dx*sa + dy*ca)*k, -9, 9);
+}
 touchEl.addEventListener('pointerdown', e => {
   audio(); try{ touchEl.setPointerCapture(e.pointerId); }catch(x){} ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, t:performance.now()});
   if(ptrs.size >= 2) multi = true;
@@ -1659,7 +1666,7 @@ touchEl.addEventListener('pointermove', e => {
   if(ptrs.size === 2 && pinch0 && !tp0){ const [a, b] = [...ptrs.values()]; const r = Math.hypot(a.x - b.x, a.y - b.y)/pinch0.d;
     let da = Math.atan2(b.y - a.y, b.x - a.x) - pinch0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
     world.rotation.y = pinch0.ry - da;
-    if(AR){ GS = clamp(pinch0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(pinch0.dist/r, 6, 40); showZoom(); return; }
+    if(AR){ GS = clamp(pinch0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else { zoomTo(pinch0.dist/r); const mx = (a.x + b.x)/2, my = (a.y + b.y)/2; if(pinch0.mx != null) pan(mx - pinch0.mx, my - pinch0.my); pinch0.mx = mx; pinch0.my = my; } showZoom(); return; }
   if(!AR && ptrs.size === 1){ orbit.az -= dx*.008; orbit.el = clamp(orbit.el + dy*.006, .18, 1.35); }
 });
 function endPtr(e){
@@ -1675,7 +1682,7 @@ function endPtr(e){
   }
 }
 touchEl.addEventListener('pointerup', endPtr); touchEl.addEventListener('pointercancel', e => { ptrs.delete(e.pointerId); pinch0 = null; if(!ptrs.size) multi = false; });
-touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .15, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else orbit.dist = clamp(orbit.dist*(e.deltaY > 0 ? 1.08 : .93), 6, 40); showZoom(); }, {passive:false});
+touchEl.addEventListener('wheel', e => { e.preventDefault(); if(AR){ GS = clamp(GS*(e.deltaY > 0 ? .93 : 1.07), .15, 3); $('sGame').value = Math.round(GS*100); applyScale(); } else zoomTo(orbit.dist*(e.deltaY > 0 ? 1.08 : .93)); showZoom(); }, {passive:false});
 function setAim3D(x, y){ aimNDC.set(x/innerWidth*2 - 1, -(y/innerHeight)*2 + 1); const c = $('cross'); c.style.left = x + 'px'; c.style.top = y + 'px'; }
 /* iPhone: o Safari usa a pinça para dar zoom na página; aqui ela vai para o jogo */
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault(), {passive:false}));
@@ -1686,7 +1693,8 @@ touchEl.addEventListener('touchmove', e => {
   if(e.touches.length !== 2 || !tp0) return; e.preventDefault();
   const g = twoTouch(e), r = g.d/Math.max(1, tp0.d); let da = g.ang - tp0.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
   world.rotation.y = tp0.ry - da;
-  if(AR){ GS = clamp(tp0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); } else orbit.dist = clamp(tp0.dist/r, 6, 40);
+  if(AR){ GS = clamp(tp0.gs*r, .15, 3); LS.set('zgs', GS); applyScale(); }
+  else { zoomTo(tp0.dist/r); const mx = (e.touches[0].clientX + e.touches[1].clientX)/2, my = (e.touches[0].clientY + e.touches[1].clientY)/2; if(tp0.mx != null) pan(mx - tp0.mx, my - tp0.my); tp0.mx = mx; tp0.my = my; }
   showZoom();
 }, {passive:false});
 let zoomT = 0;
@@ -1752,7 +1760,7 @@ async function begin(ar){
         renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
         renderer.outputEncoding = THREE.sRGBEncoding; $('ar').appendChild(renderer.domElement);
         scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .1, 200);
-        setupScene(); scene.add(root); tracking = true;
+        setupScene(); scene.add(root); tracking = true; orbit.dist = clamp(fitDist()*.9, 18, 60);
         addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
       }
       renderer.setAnimationLoop(loop);
@@ -1826,7 +1834,7 @@ function loop(time, frame){
   if(PLACE(AR) && !tracking && reticle) placeGuide(AR === 'slam' ? (reticle.visible ? 'found' : SL.state) : reticle.visible);
   const paused = AR && !tracking;
   if(!AR){
-    const r = orbit.dist; camera.position.set(Math.sin(orbit.az)*Math.cos(orbit.el)*r, Math.sin(orbit.el)*r, Math.cos(orbit.az)*Math.cos(orbit.el)*r);
+    const r = orbit.dist; camera.position.set(camTarget.x + Math.sin(orbit.az)*Math.cos(orbit.el)*r, camTarget.y + Math.sin(orbit.el)*r, camTarget.z + Math.cos(orbit.az)*Math.cos(orbit.el)*r);
     camera.lookAt(camTarget);
   }
   if(G && !paused){
