@@ -322,14 +322,37 @@ if(SB && STICKER && LS.get('secret')) SB.rpc('game_sticker_info', {p_token:STICK
 /* ================= Som (sintetizado) ================= */
 let AC = null, muted = LS.get('zmute') === '1';
 let unlocked = false;
-function audio(){
+/* Alarme, ligação, Siri ou outro app tocando som "roubam" o áudio da página (no iOS o contexto fica
+   'interrupted' e às vezes volta mudo mesmo dizendo 'running'). Quando isso acontece marcamos o áudio
+   como quebrado: tentamos retomar sozinhos e, no próximo toque na tela, recriamos o contexto do zero. */
+let audioBroken = false;
+function watchAudio(ctx){
+  ctx.onstatechange = () => { if(ctx !== AC) return; if(ctx.state !== 'running' && ctx.state !== 'closed'){ audioBroken = true; tryResume(); } };
+}
+function tryResume(){
+  if(AC && AC.state !== 'running' && AC.state !== 'closed') AC.resume().catch(() => {});
+  const k = window.__keepAudio; if(k && k.paused) k.play().catch(() => {});
+  document.querySelectorAll('#ar video').forEach(v => { if(v.paused) v.play().catch(() => {}); });   // câmera também pausa
+}
+function rebuildAudio(){
+  const kind = mus && mus.kind, eng = !!engine;
+  if(mus){ clearInterval(mus.timer); mus = null; }
+  engine = null;
+  const old = AC; AC = null; OUT = REV = MUS = null; noiseBuf = null; audioBroken = false;
+  try{ old && old.close && old.close().catch(() => {}); }catch(e){}
+  audio(true);
+  if(AC && !muted){ if(kind) music(kind); if(eng) engineOn(true); }
+}
+function audio(fromGesture){
   try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}   // toca mesmo com o iPhone no silencioso
-  if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){} }
+  if(AC && audioBroken && fromGesture !== true){ rebuildAudio(); return; }
+  if(!AC){ try{ AC = new (window.AudioContext || window.webkitAudioContext)(); watchAudio(AC);
+    const b = AC.createBuffer(1, 1, 22050), s = AC.createBufferSource(); s.buffer = b; s.connect(AC.destination); s.start(0); }catch(e){} }
   if(!AC) return;
-  if(AC.state !== 'running') AC.resume();
+  if(AC.state !== 'running') AC.resume().catch(() => {});
   if(!muted) bus();
+  const k = window.__keepAudio; if(k && k.paused) k.play().catch(() => {});
   if(!unlocked){ unlocked = true;
-    try{ const b = AC.createBuffer(1, 1, 22050), s = AC.createBufferSource(); s.buffer = b; s.connect(AC.destination); s.start(0); }catch(e){}
     // elemento <audio> silencioso: no iOS faz a página usar o canal de mídia (alto-falante) em vez do de toque
     if(/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document) try{
       const n = 4410, buf = new ArrayBuffer(44 + n), v = new DataView(buf), w = (o, t) => { for(let i=0;i<t.length;i++) v.setUint8(o + i, t.charCodeAt(i)); };
@@ -341,6 +364,11 @@ function audio(){
   }
 }
 ['pointerdown', 'touchend', 'click'].forEach(t => addEventListener(t, audio, {passive:true}));
+// volta do alarme / ligação / outro app: retoma o som e a câmera; se o contexto não voltar, o próximo toque o recria
+function onReturn(){ if(!AC) return; tryResume(); setTimeout(() => { if(AC && AC.state !== 'running') audioBroken = true; }, 600); }
+document.addEventListener('visibilitychange', () => { if(document.hidden){ if(AC) audioBroken = true; } else onReturn(); });
+addEventListener('pageshow', onReturn); addEventListener('focus', onReturn);
+if(navigator.audioSession) try{ navigator.audioSession.onstatechange = () => { if(navigator.audioSession.state === 'interrupted'){ audioBroken = true; } else onReturn(); }; }catch(e){}
 /* Cadeia de áudio: tudo passa por um compressor e uma reverberação (dá corpo e "espaço" aos sons) */
 let OUT = null, REV = null, MUS = null;
 function bus(){
@@ -356,7 +384,7 @@ function bus(){
   loadSamples();
 }
 const SAMPLES = {}, SFILES = ['moto', 'impacto', 'quebra', 'acerto', 'arma', 'vitoria', 'vida', 'z_gemido1', 'z_gemido2', 'z_dor', 'z_rapido', 'bomba1', 'bomba2', 'bomba3', 'bomba4', 'dinamite', 'pai', 'mae', 'filho', 'familia'];
-function loadSamples(){ SFILES.forEach(n => fetch('zumbi/sfx/' + n + '.mp3').then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => { const pr = AC.decodeAudioData(b, res, rej); if(pr && pr.catch) pr.catch(() => {}); })).then(buf => SAMPLES[n] = buf).catch(() => {})); }
+function loadSamples(){ SFILES.forEach(n => !SAMPLES[n] && fetch('zumbi/sfx/' + n + '.mp3').then(r => { if(!r.ok) throw 0; return r.arrayBuffer(); }).then(b => new Promise((res, rej) => { const pr = AC.decodeAudioData(b, res, rej); if(pr && pr.catch) pr.catch(() => {}); })).then(buf => SAMPLES[n] = buf).catch(() => {})); }
 function out(node, pan = 0, wet = .25){
   const p = AC.createStereoPanner ? AC.createStereoPanner() : null;
   if(p){ p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(OUT); if(wet){ const w = AC.createGain(); w.gain.value = wet; p.connect(w).connect(REV); } }
@@ -1802,7 +1830,7 @@ window.ZG = {get owner(){ return OWNER; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.
     w(0, 'RIFF'); b.setUint32(4, 36 + n*4, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 2, true); b.setUint32(24, 44100, true); b.setUint32(28, 44100*4, true); b.setUint16(32, 4, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n*4, true);
     for(let i=0;i<n;i++){ b.setInt16(44 + i*4, Math.max(-1, Math.min(1, L[i]))*32767, true); b.setInt16(46 + i*4, Math.max(-1, Math.min(1, R[i]))*32767, true); }
     let s = ''; const u = new Uint8Array(b.buffer); for(let i=0;i<u.length;i+=8192) s += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return btoa(s); },
-  audio:()=>({st:AC&&AC.state, smp:Object.keys(SAMPLES), mus:mus&&mus.kind, eng:!!engine}), wr:()=>[world.rotation.y, GS], dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
+  audioCtx:()=>AC, audio:()=>({id:AC&&(AC.__id||(AC.__id=Math.random().toString(36).slice(2,6))), br:audioBroken, st:AC&&AC.state, smp:Object.keys(SAMPLES), mus:mus&&mus.kind, eng:!!engine}), wr:()=>[world.rotation.y, GS], dbg:()=>({cam:camera.position.toArray().map(v=>+v.toFixed(3)), cq:camera.quaternion.toArray().map(v=>+v.toFixed(2)), fov:camera.fov, root:root.position.toArray().map(v=>+v.toFixed(3)), rs:root.scale.x, vis:root.visible, ret:reticle&&reticle.position.toArray().map(v=>+v.toFixed(3)), dist:SL.dist, tr:tracking, reloc:SL.reloc, can:[renderer.domElement.width,renderer.domElement.height]}), ret:()=>!!(reticle&&reticle.visible), placeXR, FX, camTarget:null, get tracking(){ return tracking; }, get seeing(){ return seeing; }, set seeing(v){ seeing = v; }, gyro:(q)=>{ devQ.copy(q); hasGyro = true; }, root:()=>root, get cast(){ return cast && {t:cast.t, x:cast.moto.position.x, off:cast.off, rang:cast.rang, got:cast.got}; }, get G(){ return G; }, get mode(){ return mode; }, ZS, spawn, explode, fire, WEAPONS, get orbit(){ return orbit; }};
 
 /* ================= Loop ================= */
 let last = performance.now();
