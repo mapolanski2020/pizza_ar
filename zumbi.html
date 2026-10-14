@@ -111,6 +111,8 @@ body.cine::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:
 @keyframes cineIn{from{box-shadow:inset 0 0 0 #000,inset 0 0 0 #000}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
+#bSound,#bQuit{width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center}
+#bQuit svg{width:20px;height:20px}
 #bSound{position:fixed;right:14px;bottom:calc(62px + env(safe-area-inset-bottom,0px));z-index:4;width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;pointer-events:auto}
 #bSound svg{width:20px;height:20px}
 .quit{position:fixed;right:14px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:4;pointer-events:auto}
@@ -190,7 +192,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
   <button class="btn primary" id="sDone" type="button">Pronto</button>
 </div>
 <button class="ghost skip" id="skip" type="button" hidden>Pular abertura</button>
-<button class="ghost quit" id="bQuit" type="button" hidden>Sair</button>
+<button class="ghost quit" id="bQuit" type="button" aria-label="Sair do jogo" title="Sair" hidden><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/><path d="M15 16l4-4-4-4M19 12H9"/></svg></button>
 <div class="scan" id="scan" hidden><div class="box"><i></i><i></i><i></i><i></i></div><p>Aponte a câmera para o adesivo da caixa. Depois de aparecer, a casa fica fixa no lugar.</p></div>
 <div class="guide" id="xrHint" hidden>
   <div class="scene" id="gScene" aria-hidden="true"><div class="table"><i></i></div><div class="phone"><b></b></div></div>
