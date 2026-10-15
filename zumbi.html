@@ -301,18 +301,19 @@ if(FASE === 2){
 /* ===== FASE 3: Os Vikings da Pizza (navio inglês no centro, vikings chegando em barquinhos) ===== */
 if(FASE === 3){
   WEAPONS = [
-    {name:'Flecha', kind:'arrow', kills:0, R:.55, dmg:1, n:1, cd:.26, color:0x8a5a2b},
-    {name:'Pedra', kind:'rock', kills:10, R:1.0, dmg:1, n:1, cd:.4, color:0x8d8a84, size:.17},
-    {name:'Machado', kind:'axe', kills:25, R:.8, dmg:2, n:1, cd:.36, color:0x9aa3ad},
-    {name:'Chuva de Flechas', kind:'arrow', kills:45, R:.55, dmg:1, n:6, spread:1.6, cd:.5, color:0x8a5a2b},
-    {name:'Pedra de Catapulta', kind:'rock', kills:70, R:2.1, dmg:3, n:1, cd:.6, color:0x6f6b66, size:.32}
+    // os ingleses atiram do navio: arco longo, mosquete e canhão
+    {name:'Arco Longo', kind:'arrow', kills:0, R:.6, dmg:1, n:1, cd:.26, color:0x8a5a2b},
+    {name:'Mosquete', kind:'musket', kills:10, R:.75, dmg:2, n:1, cd:.32, color:0x3a3a3e},
+    {name:'Canhão', kind:'cannon', kills:25, R:1.4, dmg:2, n:1, cd:.55, color:0x2a2a2e, size:.14},
+    {name:'Salva de Mosquetes', kind:'musket', kills:45, R:.75, dmg:2, n:3, spread:1.3, cd:.45, color:0x3a3a3e},
+    {name:'Canhão Pesado', kind:'cannon', kills:70, R:2.2, dmg:3, n:2, spread:1.1, cd:.65, color:0x1e1e22, size:.18}
   ];
   TYPES = {
     zumbi:{label:'Viking', models:['Barbarian'], gear:['1H_Axe', 'Barbarian_Round_Shield'], hp:1, pts:50, speed:.62, h:1.05, walk:'Running_A', ts:.55, from:0, w:5},
     escalador:{label:'Vikings ligeiros', models:['Rogue'], gear:['Knife', 'Knife_Offhand'], hp:1, pts:50, speed:.85, climbSp:.85, h:.95, walk:'Running_A', ts:.8, from:300, w:2.5},
-    esqueleto:{label:'Arqueiros vikings', models:['Rogue_Hooded'], gear:[], bow:true, archer:true, hp:1, pts:50, speed:.7, h:1, walk:'Running_A', ts:.6, from:700, w:2.2, shootT:6.5},
+    esqueleto:{label:'Arqueiros vikings', models:['Rogue'], gear:[], bow:true, archer:true, hp:1, pts:50, speed:.7, h:1, walk:'Running_A', ts:.6, from:700, w:2.2, shootT:6.5},
     guerreiro:{label:'Vikings de dois machados', models:['Barbarian'], gear:['1H_Axe', '1H_Axe_Offhand'], hp:2, pts:100, strong:true, speed:.62, h:1.1, walk:'Running_A', ts:.6, from:1500, w:2.2},
-    ninja:{label:'Arqueiros de elite', models:['Rogue_Hooded'], gear:[], bow:true, archer:true, hp:2, pts:100, strong:true, speed:.8, h:1.05, walk:'Running_A', ts:.6, from:2300, w:1.4, shootT:5},
+    ninja:{label:'Arqueiros de elite', models:['Rogue'], gear:[], bow:true, archer:true, hp:2, pts:100, strong:true, speed:.8, h:1.05, walk:'Running_A', ts:.6, from:2300, w:1.4, shootT:5},
     mago:{label:'Xamãs vikings (se teletransportam)', models:['Mage'], gear:['2H_Staff'], hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_A', blink:true, from:3000, w:1.5},
     gigante:{label:'Berserkers gigantes', models:['Barbarian'], gear:['2H_Axe'], hp:5, pts:100, strong:true, speed:.45, h:1.8, walk:'Walking_A', ts:.7, climbSp:.4, from:3800, w:1}
   };
@@ -344,7 +345,7 @@ if(FASE === 3){
   document.querySelector('#start .lede').textContent = 'A pizza foi entregue no grande navio inglês, e os vikings estão chegando em seus barcos para roubá-la. Defenda o navio!';
   const li = document.querySelectorAll('#start .steps li span');
   li[0].textContent = 'Aponte a câmera para a mesa (ou para a caixa da pizza) e toque para colocar o navio.';
-  li[1].textContent = 'Mire com o centro da tela e toque para atirar flechas. Depois vêm pedras e machados.';
+  li[1].textContent = 'Mire com o centro da tela e toque para atirar do navio: primeiro o arco longo, depois o mosquete e o canhão.';
   li[2].textContent = 'Viking comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.';
   li[3].textContent = 'Cada viking que sobe no navio, ou arqueiro que acerta o navio, tira 1 das 5 vidas.';
   $('eEye').textContent = 'Fase 2 · O Castelo da Pizza';
@@ -757,14 +758,14 @@ function template(key, zombie, bare, gear, look){
   const b = new THREE.Box3();
   s.traverse(o => { if(o.isMesh){
     // inimigos ficam sem chapéu, capuz ou capacete: aparece a cabeça de zumbi / caveira
-    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
+    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare || (gear && FASE === 3)) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
     o.frustumCulled = false;
     if(o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); }
   } });
   const gh = Math.max(.5, b.max.y - b.min.y);
   s.traverse(o => { if(o.isMesh) o.material = L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
   const tpl = {scene:s, h:gh};
-  if(zombie){
+  if(zombie || FASE === 3){
     s.updateMatrixWorld(true);
     const headMesh = []; s.traverse(o => { if(o.isMesh && o.visible && /Head/.test(o.name) && !/Hood|Hat|Helmet/.test(o.name)) headMesh.push(o); });
     const bone = s.getObjectByName('head');
@@ -935,9 +936,40 @@ function toyZombie(m, T, L){
     T.toyP.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; P.add(o); });
   }
 }
+/* ===== Vikings (fase 3): capacete de ferro com chifres, aro de bronze, protetor de nariz e barba trançada ===== */
+function vikingHelmet(m, T, key){
+  const bone = m.getObjectByName('head'), face = T.face; if(!bone || !face) return;
+  const F = new THREE.Group(); F.position.copy(face.frame.pos); F.quaternion.copy(face.frame.quat); F.scale.setScalar(face.frame.s); bone.add(F);
+  if(!T.helm){
+    const S = face.size, hx = S.x/2, hy = S.y/2, hz = S.z/2, u = S.x, G = new THREE.Group();
+    const add = (geo, mt, p, sc, r) => { const o = new THREE.Mesh(geo, mt); o.position.set(p[0], p[1], p[2]); if(sc.length) o.scale.set(sc[0], sc[1], sc[2]); else o.scale.setScalar(sc); if(r) o.rotation.set(r[0], r[1], r[2]); G.add(o); return o; };
+    const steel = mat(0x9aa3ad), bronze = mat(0xb4893a), horn = mat(0xeee4c8), dark = mat(0x5b5f66);
+    add(capGeo, steel, [0, hy*.12, -hz*.02], [hx*1.1, hy*.95, hz*1.12]);
+    add(bandGeo, bronze, [0, hy*.28, -hz*.02], [hx*1.13, hy*.13, hz*1.15]);
+    add(cubeGeo, bronze, [0, hy*.75, -hz*.02], [u*.07, hy*.9, hz*2.1], [.12, 0, 0]);          // crista de bronze
+    add(cubeGeo, steel, [0, hy*.05, hz*1.12], [u*.08, hy*.5, u*.05]);                         // protetor de nariz
+    [-1, 1].forEach(sx => {
+      add(cubeGeo, dark, [sx*hx*.95, -hy*.05, hz*.2], [u*.04, hy*.45, hz*.55]);              // protetor de bochecha
+      const cv = new THREE.CatmullRomCurve3([V(sx*hx*.9, hy*.4, 0), V(sx*hx*1.35, hy*.55, -hz*.05), V(sx*hx*1.6, hy*.95, -hz*.12), V(sx*hx*1.55, hy*1.35, -hz*.18)]);
+      const tb = new THREE.Mesh(new THREE.TubeGeometry(cv, 10, u*.085, 7), horn); G.add(tb);
+      const tip = add(new THREE.ConeGeometry(u*.085, u*.32, 7).translate(0, u*.16, 0), horn, [sx*hx*1.55, hy*1.35, -hz*.18], 1);
+      tip.quaternion.setFromUnitVectors(V(0, 1, 0), cv.getTangent(1).normalize());
+      add(new THREE.TorusGeometry(u*.09, u*.025, 6, 14), bronze, [sx*hx*1.02, hy*.42, -hz*.01], 1, [0, Math.PI/2, sx*.5]);   // anel na base do chifre
+    });
+    if(key !== 'Barbarian'){   // barba ruiva trançada (o bárbaro já tem barba)
+      const br = mat(0xb5622a);
+      add(ballGeo, br, [0, -hy*.55, hz*.75], [hx*.75, hy*.35, hz*.3]);
+      [-1, 0, 1].forEach(k => { const o = add(spikeGeo, br, [k*hx*.32, -hy*.62, hz*.82], [u*.1, u*.42, u*.08]); o.rotation.x = Math.PI; o.rotation.z = k*.15; });
+      [-1, 1].forEach(sx => add(ballGeo, bronze, [sx*hx*.32, -hy*1.02, hz*.86], u*.045));
+    }
+    T.helm = bake(G);
+  }
+  T.helm.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
+}
 function actor(key, h, zombie, bare, gear, look){
   const T = template(key, zombie, bare, gear, look), m = skClone(T.scene);
   if(look != null) toyZombie(m, T, LOOKS[look]);
+  else if(FASE === 3 && gear) vikingHelmet(m, T, key);
   else if(zombie && bare) zombieFace(m, T.face);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
@@ -1296,6 +1328,11 @@ function buildShip(){
   });
   const nest = new THREE.Mesh(new THREE.CylinderGeometry(.2, .16, .18, 12), mat(wood)); nest.position.set(.35, DECK + 3.6*.9, 0); H.add(nest);
   const bowsprit = new THREE.Mesh(new THREE.CylinderGeometry(.04, .06, 1.6, 8), mat(wood)); bowsprit.rotation.z = -1.15; bowsprit.position.set(3.55, 1.55, 0); H.add(bowsprit);
+  // canhões saindo das portinholas dos dois lados
+  [1, -1].forEach(sd => CANNONS.forEach(x => {
+    const port = box(.22, .2, .04, 0x2b1d14, .02); port.position.set(x, DECK - .32, sd*(shipHW(x) + .005)); H.add(port);
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(.05, .065, .38, 10).rotateX(Math.PI/2), mat(0x2a2a2e)); c.position.set(x, DECK - .32, sd*(shipHW(x) + .14)); H.add(c);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(.055, .015, 6, 12), mat(0x2a2a2e)); ring.position.set(x, DECK - .32, sd*(shipHW(x) + .32)); H.add(ring); }));
   // carga no convés
   [[.9, .55], [1.1, -.5], [-.6, .6]].forEach(([x, z]) => { const o = prop2('barrel', H); o.scale.setScalar(1.4); o.position.set(x, DECK, z); });
   [[-.8, -.55], [1.3, .1]].forEach(([x, z]) => { const o = prop2('crate', H); o.scale.setScalar(1.3); o.position.set(x, DECK, z); o.rotation.y = rand(0, 1); });
@@ -1362,9 +1399,19 @@ function enemyArrow(Z){
     if(q >= 1 && !landed){ landed = true; thunk(to, false); puffs(to.clone(), 0xb08050, 3, .07, .4); houseShake = Math.max(houseShake, .12); } });
 }
 function boatSync(Z){
-  const b = Z.boat; if(!b) return; const t = G ? G.t : 0, bob = Math.sin(t*2.2 + Z.bph)*.035;
-  if(Z.inBoat && Z.state !== 'dead'){ b.position.set(Z.pos.x, bob, Z.pos.z); b.rotation.set(Math.sin(t*1.7 + Z.bph)*.04, Z.A.g.rotation.y, Math.sin(t*2.2 + Z.bph + 1)*.05); Z.A.g.position.y = Z.pos.y + Z.hy + bob; }
-  else if(Z.state !== 'dead') b.position.y = bob;
+  const b = Z.boat; if(!b) return; const t = G ? G.t : 0, bob = BOATY + Math.sin(t*2.2 + Z.bph)*.03;
+  if(Z.inBoat){ b.position.set(Z.pos.x, bob, Z.pos.z); b.rotation.set(Math.sin(t*1.7 + Z.bph)*.04, Z.A.g.rotation.y, Math.sin(t*2.2 + Z.bph + 1)*.05); Z.A.g.position.y = Z.pos.y + Z.hy + bob; }
+  else if(Z.state !== 'dead' && Z.si === 1){ b.position.y = bob; Z.A.g.position.y = Z.pos.y + bob; }   // anda até a proa antes de escalar
+  else { Z.boat = null; driftAway(b); }
+}
+const BOATY = .13, DRIFT = [];
+function driftAway(b){ const d = V(b.position.x, 0, b.position.z); if(d.lengthSq() < 1e-4) d.set(1, 0, 0); d.normalize(); DRIFT.push({b, d, ph:rand(0, 6), t:0}); }
+function updateDrift(dt){
+  for(let i=DRIFT.length-1;i>=0;i--){ const o = DRIFT[i], b = o.b; o.t += dt;
+    b.position.addScaledVector(o.d, dt*Math.min(1.4, o.t*.8)); b.position.y = BOATY + Math.sin(o.t*2.2 + o.ph)*.03;
+    let dy = Math.atan2(o.d.x, o.d.z) - b.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); b.rotation.y += dy*Math.min(1, dt*1.5);
+    const r = Math.hypot(b.position.x, b.position.z); if(r > 9.0){ const k = Math.max(0, 1 - (r - 9.0)/.6); b.scale.setScalar(k); }
+    if(r > 9.6){ world.remove(b); DRIFT.splice(i, 1); } }
 }
 function splash(p, big){
   for(let i=0;i<(big ? 14 : 7);i++){ const d = new THREE.Mesh(puffGeo, fxMat(0xe8f6ff, .9)); d.position.set(p.x, .05, p.z); const v = V(rand(-1, 1)*(big ? 1.6 : 1), rand(2.5, 4.5)*(big ? 1.3 : 1), rand(-1, 1)*(big ? 1.6 : 1)), sz = rand(.05, .1)*(big ? 1.5 : 1);
@@ -1560,6 +1607,8 @@ function renderHUD(){
   $('wNext').textContent = nx ? 'Próxima arma em ' + (nx.kills - G.kills) + ' ' + (nx.kills - G.kills === 1 ? W.um : W.uns) : 'Arma máxima';
   const n = w.n;
   if(w.kind === 'arrow' || w.kind === 'fire'){ $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => '<g transform="translate(' + (i*6 - (Math.min(n, 3) - 1)*3) + ',' + (i*3) + ')"><path d="M6 34L30 10" stroke="#8a5a2b" stroke-width="3" stroke-linecap="round"/><path d="M30 10l-8 1 7 7z" fill="#cfd6dd"/><path d="M6 34l2-7M6 34l7-2" stroke="' + (w.kind === 'fire' ? '#ffc23a' : '#d8352a') + '" stroke-width="3"/>' + (w.kind === 'fire' ? '<circle cx="31" cy="9" r="4" fill="#ff8a2a"/>' : '') + '</g>').join(''); }
+  else if(w.kind === 'musket') $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => '<g transform="translate(0,' + (i*7 - (Math.min(n, 3) - 1)*3.5) + ')"><path d="M4 26l6-3h24v4H12l-6 3z" fill="#6b4426"/><rect x="16" y="20.5" width="20" height="3" rx="1" fill="#3a3a3e"/></g>').join('');
+  else if(w.kind === 'cannon') $('wIcon').innerHTML = '<rect x="8" y="14" width="24" height="9" rx="4" fill="#2a2a2e" transform="rotate(-18 20 18)"/><circle cx="14" cy="28" r="6" fill="#6b4426" stroke="#fff" stroke-width="1.2"/>' + (n > 1 ? '<circle cx="34" cy="10" r="4" fill="#2a2a2e" stroke="#fff"/><circle cx="34" cy="20" r="4" fill="#2a2a2e" stroke="#fff"/>' : '<circle cx="34" cy="12" r="4" fill="#2a2a2e" stroke="#fff"/>');
   else if(w.kind === 'axe') $('wIcon').innerHTML = '<path d="M10 34L28 12" stroke="#6b4426" stroke-width="3.5" stroke-linecap="round"/><path d="M22 8c6-3 12 1 13 7-4-2-8-1-10 2z" fill="#cfd6dd" stroke="#fff" stroke-width="1"/>';
   else $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => { const cx = n === 1 ? 18 : 10 + i*9, cy = n === 1 ? 23 : 25 - (i%2)*6, r = n === 1 ? (w.size > .2 ? 14 : 12) : 8;
     return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + hex(w.color) + '" stroke="#fff" stroke-width="1.5"/>'; }).join('') + (w.kind === 'rock' ? '' : '<circle cx="33" cy="7" r="3.5" fill="#ffd36b"/>');
@@ -1871,8 +1920,8 @@ function updateZombie(Z, dt){
   }
   if(Z.state === 'dead'){
     if(Z.fall){ Z.fall.v.y -= 12*dt; Z.pos.addScaledVector(Z.fall.v, dt); if(Z.pos.y <= 0){ Z.pos.y = 0; Z.fall = null; } A.g.position.copy(Z.pos); }
-    if(Z.t > 1.4){ A.g.position.y = Z.pos.y - (Z.t - 1.4)*.9; }
-    if(Z.boat && Z.inBoat && Z.t > .7){ Z.boat.position.y = -(Z.t - .7)*.45; Z.boat.rotation.z += dt*.25; }   // o barco afunda junto
+    if(Z.t > 1.4 && !Z.boat){ A.g.position.y = Z.pos.y - (Z.t - 1.4)*.9; }
+    if(Z.boat && Z.inBoat && Z.t > 1.2){ Z.inBoat = false; Z.A.g.visible = false; boatSync(Z); }   // o barco vai embora boiando
     if(Z.t > 2.2) removeZ(Z);
   }
 }
@@ -1888,7 +1937,7 @@ function arrive(Z){
 function enterHouse(Z){ Z.state = 'enter'; Z.t = 0; loseLife(Z, Z.wall ? W.subiu : W.entrou); puffs(Z.pos.clone().setY(.6), 0xc39a6b, 8, .18); }
 function dropLadder(Z){ if(Z.ladM){ const m = Z.ladM; Z.ladM = null; setTimeout(() => house.remove(m), 600); } }
 function removeZ(Z){ dropLadder(Z);
-  if(Z.boat){ const b = Z.boat; Z.boat = null; const y0 = b.position.y; fx(b, 1.6, (f, k) => { b.position.y = y0 - k*.7; b.rotation.z += .004; }); } world.remove(Z.A.g); Z.state = 'gone'; Z.A.mixer.stopAllAction(); const i = ZS.indexOf(Z); if(i >= 0) ZS.splice(i, 1); }
+  if(Z.boat){ const b = Z.boat; Z.boat = null; driftAway(b); } world.remove(Z.A.g); Z.state = 'gone'; Z.A.mixer.stopAllAction(); const i = ZS.indexOf(Z); if(i >= 0) ZS.splice(i, 1); }
 function loseLife(Z, msg){
   if(mode !== 'play') return;
   G.lives--; G.lost++; ouch(); renderHUD();
@@ -1948,13 +1997,37 @@ function fire(ndc){
   for(let i=0;i<w.n;i++){
     const off = i === 0 ? V() : V(Math.cos(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1), 0, Math.sin(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1));
     const to = T0.clone().add(off); if(i > 0) to.y = Math.max(0, i && hit.ground ? 0 : to.y);
-    const from = start.clone().lerp(to, .55); from.y = Math.max(from.y, to.y + 1.5);
-    const arrow = w.kind === 'arrow' || w.kind === 'fire' || w.kind === 'axe';
-    const m = w.kind === 'axe' ? makeAxe() : w.kind === 'rock' ? makeRock(w) : arrow ? makeArrow(w) : makeBomb(w); m.position.copy(from); world.add(m);
+    let from = start.clone().lerp(to, .55); from.y = Math.max(from.y, to.y + 1.5);
+    if(FASE === 3) from = shipMuzzle(to, w.kind);
+    const arrow = w.kind === 'arrow' || w.kind === 'fire' || w.kind === 'axe' || w.kind === 'musket';
+    const m = w.kind === 'musket' ? makeBullet() : w.kind === 'cannon' ? makeBall(w) : w.kind === 'axe' ? makeAxe() : w.kind === 'rock' ? makeRock(w) : arrow ? makeArrow(w) : makeBomb(w); m.position.copy(from); world.add(m);
     const dist = from.distanceTo(to);
-    BOMBS.push({m, from, to, t:-i*.08, dur:arrow ? clamp(.16 + dist*.018, .18, .4) : clamp(.28 + dist*.03, .3, .65), w, arc:arrow ? clamp(dist*.07, .15, .7) : clamp(dist*.25, .6, 2.2), arrow});
+    let dur = arrow ? clamp(.16 + dist*.018, .18, .4) : clamp(.28 + dist*.03, .3, .65), arc = arrow ? clamp(dist*.07, .15, .7) : clamp(dist*.25, .6, 2.2);
+    if(w.kind === 'musket'){ dur = clamp(dist*.012, .05, .14); arc = 0; } else if(w.kind === 'cannon'){ dur = clamp(.22 + dist*.035, .3, .6); arc = clamp(dist*.12, .3, 1.1); } else if(FASE === 3 && w.kind === 'arrow') arc = clamp(dist*.1, .2, .9);
+    BOMBS.push({m, from, to, t:-i*.08, dur, w, arc, arrow});
+    if(FASE === 3) setTimeout(() => muzzle(from, to, w.kind), i*80);
   }
-  if(w.kind === 'arrow' || w.kind === 'fire') twang(w.kind === 'fire'); else whoosh();
+  if(w.kind === 'arrow' || w.kind === 'fire') twang(w.kind === 'fire'); else if(w.kind !== 'musket' && w.kind !== 'cannon') whoosh();
+}
+/* ===== Tiros ingleses (fase 3): saem da amurada (arco e mosquete) ou das portinholas dos canhões ===== */
+function shipMuzzle(to, kind){
+  const x = clamp(to.x/HS, -1.7, 1.6), sz = Math.sign(to.z) || 1;
+  if(kind === 'cannon'){ const cx = CANNONS.reduce((b, c) => Math.abs(c - x) < Math.abs(b - x) ? c : b, CANNONS[0]); return V(cx*HS, (DECK - .32)*HS + house.position.y, sz*(shipHW(cx) + .32)*HS); }
+  return V(x*HS, (DECK + .5)*HS + house.position.y, sz*(shipHW(x) - .05)*HS);
+}
+const CANNONS = [-1.2, -.4, .4, 1.15];
+function makeBullet(){ const g = new THREE.Group(); const b = new THREE.Mesh(sphereGeo, mat(0x3a3a3e)); b.scale.setScalar(.045); g.add(b);
+  const tr = new THREE.Mesh(new THREE.CylinderGeometry(.012, .002, .5, 5).rotateX(-Math.PI/2).translate(0, 0, -.25), fxMat(0xfff2c0, .8)); g.add(tr); return g; }
+function makeBall(w){ const m = new THREE.Mesh(bombGeo, mat(w.color)); m.scale.setScalar(w.size); return m; }
+function muzzle(p, to, kind){
+  const big = kind === 'cannon', fl = new THREE.Mesh(sphereGeo, fxMat(0xffd36b));
+  const dir = to.clone().sub(p).setY(0).normalize(), fp = p.clone().addScaledVector(dir, big ? .15 : .08); fl.position.copy(fp);
+  fx(fl, .12, (f, k) => { fl.scale.setScalar((big ? .32 : .14)*(1 - k*.5)); fl.material.opacity = 1 - k; });
+  for(let i=0;i<(big ? 9 : 4);i++){ const sm = new THREE.Mesh(puffGeo, fxMat(0xe9e6e0, .85)); sm.position.copy(fp); const v = dir.clone().multiplyScalar(rand(.4, 1.4)*(big ? 1.3 : .8)).add(V(rand(-.2, .2), rand(.1, .5), rand(-.2, .2))), sz = rand(.07, .14)*(big ? 1.6 : .8);
+    fx(sm, big ? 1.6 : 1, (f, k, dt) => { sm.position.addScaledVector(v, dt); v.multiplyScalar(1 - dt*2); sm.scale.setScalar(sz*(1 + k*2)); sm.material.opacity = .85*(1 - k); }); }
+  if(!ok()) return; const t = AC.currentTime, pan = panOf(p);
+  if(big){ tone('sine', 110, 38, .5, .9, 0, pan, .5); const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(1800, t); f.frequency.exponentialRampToValueAtTime(200, t + .7); env(g, t, .003, 1.0, .8); n.connect(f).connect(g); out(g, pan, .6); n.start(t, Math.random()); n.stop(t + 1); houseShake = Math.max(houseShake, .15); }
+  else { const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'highpass'; f.frequency.value = 900; env(g, t, .001, .9, .12); n.connect(f).connect(g); out(g, pan, .35); n.start(t, Math.random()); n.stop(t + .2); tone('sine', 160, 60, .1, .5, 0, pan, .2); }
 }
 /* ===== Pedras e machados (fase 3) ===== */
 const rockGeo = new THREE.IcosahedronGeometry(1, 0);
@@ -1968,9 +2041,10 @@ function makeAxe(){
 }
 function rockLand(p, w){
   const water = FASE === 3 && p.y < .08 && Math.hypot(p.x, p.z) < 9.5;
-  if(water) splash(p, w.R > 1.5); else puffs(p.clone().setY(p.y + .1), 0x9a8f80, w.R > 1.5 ? 12 : 7, w.R > 1.5 ? .22 : .14, .7);
+  if(water) splash(p, w.R > 1.2); else puffs(p.clone().setY(p.y + .1), 0x9a8f80, w.R > 1.5 ? 12 : 7, w.R > 1.5 ? .22 : .14, .7);
+  if(w.kind === 'cannon'){ explosionFX(p.clone().setY(Math.max(p.y, .1)), w.R*.6, 0xff8a3a); }
   const ring = new THREE.Mesh(ringGeo, fxMat(0xffffff, .6)); ring.position.set(p.x, p.y + .06, p.z); fx(ring, .5, (f, k) => { ring.scale.setScalar(w.R*(.3 + k*.9)); ring.material.opacity = .6*(1 - k); });
-  sample('quebra', w.R > 1.5 ? .9 : .6, rand(.7, .9), panOf(p), .25); tone('sine', 120, 45, .25, w.R > 1.5 ? .5 : .3, 0, panOf(p), .1);
+  if(w.kind === 'cannon') boom(w.R > 1.8, p, w.R > 1.8 ? 'bomba4' : 'bomba2'); else sample('quebra', w.R > 1.5 ? .9 : .6, rand(.7, .9), panOf(p), .25); tone('sine', 120, 45, .25, w.R > 1.5 ? .5 : .3, 0, panOf(p), .1);
   if(w.R > 1.5) shake = Math.max(shake, .25);
   for(const Z of ZS.slice()){ const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5; if(c.distanceTo(p) < w.R + .25*Z.T.h) damage(Z, w.dmg, p); }
 }
@@ -1980,12 +2054,14 @@ function updateBombs(dt){
     const k = Math.min(1, b.t/b.dur);
     const prev = b.m.position.clone();
     b.m.position.lerpVectors(b.from, b.to, k); b.m.position.y += Math.sin(k*Math.PI)*b.arc;
-    if(b.w.kind === 'axe'){ b.m.rotation.x -= dt*22; const d = b.to.clone().sub(b.from); b.m.rotation.y = Math.atan2(d.x, d.z); }
+    if(b.w.kind === 'musket'){ const d = b.to.clone().sub(b.from); if(d.lengthSq() > 1e-6) b.m.lookAt(world.localToWorld(b.m.position.clone().add(d))); }
+    else if(b.w.kind === 'cannon'){ if(Math.random() < .5) puffs(b.m.position.clone(), 0xdedad4, 1, .05, .35); }
+    else if(b.w.kind === 'axe'){ b.m.rotation.x -= dt*22; const d = b.to.clone().sub(b.from); b.m.rotation.y = Math.atan2(d.x, d.z); }
     else if(b.w.kind === 'rock'){ b.m.rotation.x += dt*7; b.m.rotation.z += dt*4; }
     else if(b.arrow){ const ahead = b.m.position.clone().add(b.m.position.clone().sub(prev)); if(ahead.distanceToSquared(b.m.position) > 1e-8) b.m.lookAt(world.localToWorld(ahead));
       if(b.w.kind === 'fire'){ b.m.userData.flame.scale.setScalar(.6 + Math.random()*.5); if(Math.random() < .6) puffs(b.m.position.clone(), 0xff9a3a, 1, .06, .2); } }
     else if(b.m.userData.spark){ b.m.rotation.x += dt*10; b.m.rotation.z += dt*6; b.m.userData.spark.scale.setScalar(.22 + Math.random()*.18); }
-    if(k >= 1){ BOMBS.splice(i, 1); if(b.arrow) arrowLand(b); else if(b.w.kind === 'rock'){ world.remove(b.m); rockLand(b.to, b.w); } else { world.remove(b.m); explode(b.to, b.w); } }
+    if(k >= 1){ BOMBS.splice(i, 1); if(b.arrow) arrowLand(b); else if(b.w.kind === 'rock' || b.w.kind === 'cannon'){ world.remove(b.m); rockLand(b.to, b.w); } else { world.remove(b.m); explode(b.to, b.w); } }
   }
 }
 /* ===== Flechas (fase 2) ===== */
@@ -2005,7 +2081,8 @@ function arrowLand(b){
   // a flecha fica cravada um instante
   b.m.position.copy(p); const m = b.m, s0 = m.scale.x; fx(m, 1.1, (f, k) => { m.scale.setScalar(s0*(k > .7 ? (1 - k)/.3 : 1)); });
   const wet = FASE === 3 && p.y < .08 && Math.hypot(p.x, p.z) < 9.5;
-  if(w.kind === 'arrow' || w.kind === 'axe'){
+  if(w.kind === 'musket'){ world.remove(m); }
+  if(w.kind === 'arrow' || w.kind === 'axe' || w.kind === 'musket'){
     let best = null, bd = w.R + .3;
     for(const Z of ZS){ if(['dead', 'gone', 'enter', 'chimney', 'party'].includes(Z.state)) continue; const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5; const d = c.distanceTo(p) - Z.T.h*.25; if(d < bd){ bd = d; best = Z; } }
     if(wet && !best) splash(p, false); else puffs(p.clone().setY(p.y + .05), 0xb59a72, 3, .08, .4);
@@ -2136,7 +2213,7 @@ $('bQuit').addEventListener('click', () => { tutOff(); music(null); if(cast) end
 const touchEl = $('touch'), ptrs = new Map();
 let orbit = {az:.35, el:.72, dist:24}, pinch0 = null, drag = null, multi = false;
 function fitDist(){ const asp = innerWidth/innerHeight, v = (camera ? camera.fov : 48)*Math.PI/360, h = Math.atan(Math.tan(v)*asp); return 10.2/Math.tan(Math.min(v, h)); }
-const ZMIN = 4, zmax = () => Math.max(30, fitDist()*1.15);
+const ZMIN = 4, zmax = () => Math.min(48, Math.max(22, fitDist()));   // afasta só até caber o tabuleiro inteiro
 function zoomTo(d){ orbit.dist = clamp(d, ZMIN, zmax()); }
 function pan(dx, dy){ // arrastar com dois dedos: move a vista sobre o tabuleiro
   const k = orbit.dist/innerHeight*1.2, ca = Math.cos(orbit.az), sa = Math.sin(orbit.az);
@@ -2247,7 +2324,7 @@ async function begin(ar){
         renderer = new THREE.WebGLRenderer({antialias:true, alpha:true}); renderer.setPixelRatio(Math.min(2, devicePixelRatio)); renderer.setSize(innerWidth, innerHeight);
         renderer.outputEncoding = THREE.sRGBEncoding; $('ar').appendChild(renderer.domElement);
         scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(48, innerWidth/innerHeight, .1, 200);
-        setupScene(); scene.add(root); tracking = true; orbit.dist = clamp(fitDist()*.9, 18, 60);
+        setupScene(); scene.add(root); tracking = true; orbit.dist = clamp(fitDist()*.9, 18, zmax());
         addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
       }
       renderer.setAnimationLoop(loop);
@@ -2282,7 +2359,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {get owner(){ return OWNER; }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {get owner(){ return OWNER; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
@@ -2347,7 +2424,7 @@ function loop(time, frame){
     if(party) updateParty(dt);
     updateFX(dt);
     if(houseShake > 0){ houseShake = Math.max(0, houseShake - dt); house.position.set(Math.sin(now/18)*.06*houseShake*2, 0, Math.cos(now/23)*.05*houseShake*2); } else house.position.set(0, 0, 0);
-    if(FASE === 3){ const ts = now/1000; seaU.value = ts; if(seaTex) seaTex.offset.set(ts*.012, ts*.007);   // mar e navio balançando
+    if(FASE === 3){ const ts = now/1000; seaU.value = ts; updateDrift(dt); if(seaTex) seaTex.offset.set(ts*.012, ts*.007);   // mar e navio balançando
       house.position.y += Math.sin(ts*.9)*.03*HS; house.rotation.x = Math.sin(ts*.7)*.018; house.rotation.z = Math.sin(ts*.55 + 1)*.01;
       if(foam){ foam.material.opacity = .4 + Math.sin(ts*2.2)*.15; foam.scale.x = 3.25 + Math.sin(ts*1.3)*.05; } }
     if(shake > 0){ shake = Math.max(0, shake - dt*.8); world.position.set(rand(-1, 1)*shake*.25, 0, rand(-1, 1)*shake*.25); } else world.position.set(0, 0, 0);
