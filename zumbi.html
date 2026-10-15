@@ -271,7 +271,7 @@ let TYPES = {
   // cada tipo usa um dos bonecos do "Kit de Orda de Zumbis" (looks em LOOKS)
   zumbi:{label:'Zumbi', models:['Rogue','Barbarian'], looks:[6, 7, 8], zombie:true, hp:1, pts:50, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, from:0, w:5},
   escalador:{label:'Zumbis de boné (sobem no telhado)', models:['Rogue'], looks:[1], zombie:true, hp:1, pts:50, speed:.62, h:1, walk:'Walking_D_Skeletons', climb:true, from:300, w:2},
-  esqueleto:{label:'Zumbis corredores', models:['Rogue'], looks:[3], zombie:true, hp:1, pts:50, speed:1.15, h:.95, walk:'Running_A', ts:.85, from:700, w:3},
+  esqueleto:{label:'Zumbi mulher', models:['ZumbiMulher'], zombie:true, hp:1, pts:50, speed:.75, h:1.55, walk:'Walking_D_Skeletons', from:0, w:2.5},
   guerreiro:{label:'Zumbis mecânicos', models:['Barbarian'], looks:[2], zombie:true, hp:2, pts:100, strong:true, speed:.7, h:1.1, walk:'Walking_D_Skeletons', ts:.75, from:1500, w:2.2},
   ninja:{label:'Zumbis ladrões (sobem no telhado)', models:['Rogue'], looks:[5], zombie:true, hp:2, pts:100, strong:true, speed:1, h:1, walk:'Running_A', ts:.8, climb:true, from:2300, w:1.6},
   mago:{label:'Zumbis remendados (se teletransportam)', models:['Barbarian'], looks:[4], zombie:true, hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_D_Skeletons', ts:.7, blink:true, from:3000, w:1.5},
@@ -707,7 +707,7 @@ function toonOf(m, zombie){
 const manager = new THREE.LoadingManager();
 manager.onProgress = (u, a, b) => { $('loadFill').style.width = Math.round(a/b*100) + '%'; };
 const loader = new GLTFLoader(manager);
-const FILES = FASE === 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props'];
+const FILES = FASE === 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'ZumbiMulher', 'props'];
 const GL = {};
 const KEEP = /Body|Arm|Leg|Head|Hat|Helmet|Cape|Cloak|Eyes|Jaw|Skull|Hood/;
 const TPL = {};
@@ -899,7 +899,88 @@ function toyZombie(m, T, L){
     T.toyP.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; P.add(o); });
   }
 }
+/* ===== Zumbi mulher (modelo do Tripo, cores originais). O modelo veio sem animações:
+   tudo é feito aqui, girando os ossos dela a cada quadro (andar de zumbi, subir, atacar, apanhar, morrer, festa). ===== */
+const QX = new THREE.Quaternion(), QW = new THREE.Quaternion(), QP = new THREE.Quaternion(), QR = new THREE.Quaternion(), AX = {x:V(1, 0, 0), y:V(0, 1, 0), z:V(0, 0, 1)};
+let womanTpl = null;
+function womanTemplate(){
+  if(womanTpl) return womanTpl;
+  const s = skClone(GL.ZumbiMulher.scene);
+  s.traverse(o => { if(o.isMesh){ const m = o.material; o.material = new THREE.MeshToonMaterial({map:m.map, color:0xffffff, gradientMap:GRAD}); o.frustumCulled = false; } });
+  // altura pela posição da cabeça (o topo fica ~17% acima do osso Head)
+  s.updateMatrixWorld(true); const hd = s.getObjectByName('Head'), w = V(); hd.getWorldPosition(w);
+  return (womanTpl = {scene:s, h:Math.max(.3, w.y*1.17)});
+}
+function womanActor(h){
+  const T = womanTemplate(), m = skClone(T.scene);
+  m.scale.setScalar(h/T.h);
+  const g = new THREE.Group(); g.add(m);
+  const sh = new THREE.Mesh(blobGeo, blobMat); sh.position.y = .06; sh.scale.setScalar(h); g.add(sh);
+  const N = ['Hips', 'Spine', 'Chest', 'UpperChest', 'Neck', 'Head', 'Left_Shoulder', 'Right_Shoulder', 'Left_UpperArm', 'Right_UpperArm', 'Left_LowerArm', 'Right_LowerArm', 'Left_Hand', 'Right_Hand', 'Left_UpperLeg', 'Right_UpperLeg', 'Left_LowerLeg', 'Right_LowerLeg', 'Left_Foot', 'Right_Foot'];
+  const B = {}; N.forEach(n => { const o = m.getObjectByName(n); if(o) B[n] = o; });
+  const rest = Object.values(B).map(b => [b, b.quaternion.clone()]);
+  const ph0 = rand(0, 6.28), tilt = rand(.12, .3)*(Math.random() < .5 ? -1 : 1);
+  // gira o osso em torno de um eixo do corpo dela (x = para a esquerda dela, y = para cima, z = para a frente)
+  const rot = (n, ax, a) => { const b = B[n]; if(!b || !a) return;
+    m.getWorldQuaternion(QR); b.parent.getWorldQuaternion(QP); QP.premultiply(QR.invert());   // pai, no espaço do corpo
+    QX.setFromAxisAngle(AX[ax], a); QW.copy(QP).invert().multiply(QX).multiply(QP); b.quaternion.premultiply(QW); };
+  // aponta o osso n (até o filho cn) para a direção dir, no espaço do corpo
+  const PA = V(), PB = V(), D = V(), MI = new THREE.Matrix4();
+  const aim = (n, cn, dir) => { const b = B[n], c = B[cn]; if(!b || !c) return;
+    MI.copy(m.matrixWorld).invert(); b.getWorldPosition(PA).applyMatrix4(MI); c.getWorldPosition(PB).applyMatrix4(MI);
+    D.subVectors(PB, PA).normalize(); QX.setFromUnitVectors(D, dir.normalize());
+    m.getWorldQuaternion(QR); b.parent.getWorldQuaternion(QP); QP.premultiply(QR.invert());
+    QW.copy(QP).invert().multiply(QX).multiply(QP); b.quaternion.premultiply(QW); };
+  const A = {g, m, shadow:sh, name:'', cur:null, t:0, ts:1, once:false, woman:true,
+    play(n, o = {}){ if(A.name === n && !o.restart) return A.cur; A.name = n; A.t = 0; A.ts = o.ts || 1; A.once = !!o.once; A.cur = {name:n}; return A.cur; },
+    mixer:{stopAllAction(){}, update(dt){
+      A.t += dt*A.ts; const t = A.t, n = A.name, p = (t + ph0)*1;
+      rest.forEach(([b, q]) => b.quaternion.copy(q));
+      m.rotation.set(0, 0, 0); m.position.set(0, 0, 0);
+      m.updateMatrixWorld(true);
+      // fwd: 0 = braço para baixo, 1.57 = para a frente, 3.1 = para cima; bend = cotovelo
+      const arm = (sd, fwd, spread, bend = .2) => { const sx = sd === 'Left' ? 1 : -1;
+        aim(sd + '_UpperArm', sd + '_LowerArm', V(sx*(spread + .03), -Math.cos(fwd), Math.sin(fwd)));
+        aim(sd + '_LowerArm', sd + '_Hand', V(sx*spread*.6, -Math.cos(fwd + bend), Math.sin(fwd + bend))); };
+      const arms = (fwd, spread, wob, bend) => { arm('Left', fwd + Math.sin(p*3)*wob, spread, bend); arm('Right', fwd + Math.sin(p*3 + 2)*wob, spread, bend); };
+      if(/Death/.test(n)){   // cai de costas, braços soltos
+        const k = Math.min(1, t/.55), e = k*k*(3 - 2*k);
+        rot('Spine', 'x', -.25*e); rot('Head', 'x', -.4*e); arms(1.45 + e*.8, .1 + .5*e, 0, .2);
+        rot('Left_UpperLeg', 'x', -.35*e); rot('Right_UpperLeg', 'x', -.15*e);
+        m.rotation.x = -e*Math.PI*.47; m.position.y = Math.sin(e*Math.PI)*.08*h;
+        return; }
+      if(/Hit/.test(n)){ const k = Math.sin(Math.min(1, t/.35)*Math.PI);
+        rot('Spine', 'x', -.35*k); rot('Head', 'x', -.5*k); rot('Head', 'z', tilt); arms(1.45 - .9*k, .1 + .5*k, 0, .2); return; }
+      if(/Cheer|Taunt/.test(n)){ const w = Math.sin(t*7);
+        rot('Spine', 'z', w*.12); rot('Head', 'z', -w*.2); arms(2.7 + w*.2, .45, 0, .1); m.position.y = Math.abs(Math.sin(t*7))*.04*h; return; }
+      if(/Attack|Punch|Chop/.test(n)){ const a = t*7;   // bate na porta / parede com os braços
+        rot('Spine', 'x', .25 + Math.sin(a)*.12); rot('Head', 'x', .2); rot('Head', 'z', tilt);
+        ['Left', 'Right'].forEach((sd, i) => { const sw = Math.sin(a + i*Math.PI); arm(sd, 1.9 + sw*.6, .05, -.3 - Math.max(0, sw)*.5); });
+        return; }
+      if(/Running_C/.test(n)){ const a = t*8;   // escalando
+        ['Left', 'Right'].forEach((sd, i) => { const sw = Math.sin(a + i*Math.PI); arm(sd, 2.6 + sw*.4, .2, .1);
+          rot(sd + '_UpperLeg', 'x', -.6 - sw*.5); rot(sd + '_LowerLeg', 'x', .9 + sw*.4); });
+        rot('Spine', 'x', .2); return; }
+      if(/Jump/.test(n)){ const k = Math.sin(Math.min(1, t/.6)*Math.PI);
+        arms(1.5 + k*.8, .4, 0, .2); rot('Left_UpperLeg', 'x', -.8*k); rot('Right_UpperLeg', 'x', -.5*k); rot('Left_LowerLeg', 'x', 1.2*k); rot('Right_LowerLeg', 'x', .9*k); return; }
+      if(/Spawn/.test(n)){ const k = Math.min(1, t/1);   // sai da terra com os braços para cima
+        rot('Spine', 'x', .3*(1 - k)); rot('Head', 'x', .3); arms(2.7 - k*1.2, .25, .15, .1); return; }
+      const walking = /Walk|Run/.test(n), sp = walking ? (/Run/.test(n) ? 6.5 : 4.4) : 1.6;
+      const a = (t*sp + ph0), sw = walking ? Math.sin(a) : 0;
+      // andar de zumbi: corcunda, cabeça caída, braços esticados para a frente, mancando
+      rot('Spine', 'x', .32); rot('Chest', 'z', Math.sin(a)*.08); rot('Hips', 'z', Math.sin(a)*.07);
+      rot('Head', 'z', tilt + Math.sin(a*.5)*.12); rot('Head', 'x', .25 + Math.sin(a*.7)*.08);
+      arms(1.45, .08, walking ? .1 : .04, .15);
+      if(walking){ rot('Left_UpperLeg', 'x', -sw*.45); rot('Right_UpperLeg', 'x', sw*.38);
+        rot('Left_LowerLeg', 'x', Math.max(0, -Math.cos(a))*.75 + .1); rot('Right_LowerLeg', 'x', Math.max(0, Math.cos(a))*.6 + .1);
+        rot('Left_Foot', 'x', -sw*.15); rot('Right_Foot', 'x', sw*.15);
+        m.position.y = -Math.abs(Math.sin(a))*.025*h; m.rotation.z = Math.sin(a)*.06; }
+      else { rot('Spine', 'z', Math.sin(t*1.3 + ph0)*.06); }
+    }}};
+  return A;
+}
 function actor(key, h, zombie, bare, gear, look){
+  if(key === 'ZumbiMulher') return womanActor(h);
   const T = template(key, zombie, bare, gear, look), m = skClone(T.scene);
   if(look != null) toyZombie(m, T, LOOKS[look]);
   else if(zombie && bare) zombieFace(m, T.face);
@@ -2002,7 +2083,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {get owner(){ return OWNER; }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {get owner(){ return OWNER; }, mk:(key, h, anim, x, ry = 0)=>{ const A = actor(key, h, true, true, null, null); A.g.position.set(x, 0, 3.6); A.g.rotation.y = ry; world.add(A.g); A.play(anim); setInterval(() => A.mixer.update(.016), 16); return 1; }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
