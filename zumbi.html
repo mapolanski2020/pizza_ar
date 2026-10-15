@@ -279,7 +279,7 @@ let TYPES = {
 };
 
 /* ===== FASE 2: O Castelo da Pizza (invasores medievais, flechas, flechas de fogo e bombas) ===== */
-const FASE = clamp(parseInt(new URLSearchParams(location.search).get('fase')) || 1, 1, 2);
+const FASE = clamp(parseInt(new URLSearchParams(location.search).get('fase')) || 1, 1, 3);
 if(FASE === 2){
   WEAPONS = [
     {name:'Flecha', kind:'arrow', kills:0, R:.55, dmg:1, n:1, cd:.26, color:0x8a5a2b, snd:'bomba1'},
@@ -298,9 +298,29 @@ if(FASE === 2){
     gigante:{label:'Ogros gigantes', models:['Barbarian'], gear:['2H_Axe'], hp:5, pts:100, strong:true, speed:.45, h:1.8, walk:'Walking_A', ts:.7, attack:'2H_Melee_Attack_Chop', from:3800, w:1, breakT:1.5}
   };
 }
+/* ===== FASE 3: Os Vikings da Pizza (navio inglês no centro, vikings chegando em barquinhos) ===== */
+if(FASE === 3){
+  WEAPONS = [
+    {name:'Flecha', kind:'arrow', kills:0, R:.55, dmg:1, n:1, cd:.26, color:0x8a5a2b},
+    {name:'Pedra', kind:'rock', kills:10, R:1.0, dmg:1, n:1, cd:.4, color:0x8d8a84, size:.17},
+    {name:'Machado', kind:'axe', kills:25, R:.8, dmg:2, n:1, cd:.36, color:0x9aa3ad},
+    {name:'Chuva de Flechas', kind:'arrow', kills:45, R:.55, dmg:1, n:6, spread:1.6, cd:.5, color:0x8a5a2b},
+    {name:'Pedra de Catapulta', kind:'rock', kills:70, R:2.1, dmg:3, n:1, cd:.6, color:0x6f6b66, size:.32}
+  ];
+  TYPES = {
+    zumbi:{label:'Viking', models:['Barbarian'], gear:['1H_Axe', 'Barbarian_Round_Shield'], hp:1, pts:50, speed:.62, h:1.05, walk:'Running_A', ts:.55, from:0, w:5},
+    escalador:{label:'Vikings ligeiros', models:['Rogue'], gear:['Knife', 'Knife_Offhand'], hp:1, pts:50, speed:.85, climbSp:.85, h:.95, walk:'Running_A', ts:.8, from:300, w:2.5},
+    esqueleto:{label:'Arqueiros vikings', models:['Rogue_Hooded'], gear:[], bow:true, archer:true, hp:1, pts:50, speed:.7, h:1, walk:'Running_A', ts:.6, from:700, w:2.2, shootT:6.5},
+    guerreiro:{label:'Vikings de dois machados', models:['Barbarian'], gear:['1H_Axe', '1H_Axe_Offhand'], hp:2, pts:100, strong:true, speed:.62, h:1.1, walk:'Running_A', ts:.6, from:1500, w:2.2},
+    ninja:{label:'Arqueiros de elite', models:['Rogue_Hooded'], gear:[], bow:true, archer:true, hp:2, pts:100, strong:true, speed:.8, h:1.05, walk:'Running_A', ts:.6, from:2300, w:1.4, shootT:5},
+    mago:{label:'Xamãs vikings (se teletransportam)', models:['Mage'], gear:['2H_Staff'], hp:3, pts:100, strong:true, speed:.55, h:1.05, walk:'Walking_A', blink:true, from:3000, w:1.5},
+    gigante:{label:'Berserkers gigantes', models:['Barbarian'], gear:['2H_Axe'], hp:5, pts:100, strong:true, speed:.45, h:1.8, walk:'Walking_A', ts:.7, climbSp:.4, from:3800, w:1}
+  };
+}
 Object.entries(TYPES).forEach(([k, T]) => T.key = k);
-const W = FASE === 2 ? {um:'invasor', uns:'invasores', Os:'Os invasores', casa:'o castelo', Casa:'Castelo', entrou:'Um invasor entrou no castelo!', subiu:'Um invasor subiu a muralha!', horda:'Ataque em massa!', arma:'flecha'}
-                     : {um:'zumbi', uns:'zumbis', Os:'Os zumbis', casa:'a casa', Casa:'Casa', entrou:'Um zumbi entrou na casa!', subiu:'Entrou pela chaminé!', horda:'Horda de zumbis!', arma:'bomba'};
+const W = FASE === 3 ? {um:'viking', uns:'vikings', Os:'Os vikings', casa:'o navio', Casa:'Navio', entrou:'Um viking invadiu o navio!', subiu:'Um viking subiu no navio!', horda:'Ataque viking!', arma:'flecha', flechas:'As flechas vikings acertaram o navio!', Inv:'Vikings'}
+        : FASE === 2 ? {um:'invasor', uns:'invasores', Os:'Os invasores', casa:'o castelo', Casa:'Castelo', entrou:'Um invasor entrou no castelo!', subiu:'Um invasor subiu a muralha!', horda:'Ataque em massa!', arma:'flecha', Inv:'Invasores'}
+                     : {um:'zumbi', uns:'zumbis', Os:'Os zumbis', casa:'a casa', Casa:'Casa', entrou:'Um zumbi entrou na casa!', subiu:'Entrou pela chaminé!', horda:'Horda de zumbis!', arma:'bomba', Inv:'Zumbis'};
 /* ===== Cartão fidelidade ===== */
 const CFG = window.PIZZA_CONFIG || {};
 const SB = (CFG.SUPABASE_URL && CFG.SUPABASE_ANON_KEY && window.supabase) ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY) : null;
@@ -317,6 +337,16 @@ if(FASE === 2){
   li[1].textContent = 'Mire com o centro da tela e toque para atirar flechas. Depois vêm flechas de fogo e bombas.';
   li[2].textContent = 'Invasor comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.';
   li[3].textContent = 'Cada invasor que passa pelo portão ou sobe a muralha tira 1 das 5 vidas.';
+}
+if(FASE === 3){
+  document.title = 'Vikings da Pizza AR';
+  $('pzEyebrow').textContent = 'Monte a Pizza · Fase 3'; document.querySelector('#start h1').textContent = 'Os Vikings da Pizza';
+  document.querySelector('#start .lede').textContent = 'A pizza foi entregue no grande navio inglês, e os vikings estão chegando em seus barcos para roubá-la. Defenda o navio!';
+  const li = document.querySelectorAll('#start .steps li span');
+  li[0].textContent = 'Aponte a câmera para a mesa (ou para a caixa da pizza) e toque para colocar o navio.';
+  li[1].textContent = 'Mire com o centro da tela e toque para atirar flechas. Depois vêm pedras e machados.';
+  li[2].textContent = 'Viking comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.';
+  li[3].textContent = 'Cada viking que sobe no navio, ou arqueiro que acerta o navio, tira 1 das 5 vidas.';
   $('eEye').textContent = 'Fase 2 · O Castelo da Pizza';
 }
 { const b = loadP().best[FASE]; if(b) $('bestNote').textContent = 'Seu recorde: ' + fmt(b) + ' pontos.'; }
@@ -459,7 +489,7 @@ const VOICES = {
 };
 let lastGroan = 0;
 function groan(p, kind = 'groan', T){
-  if(FASE === 2){ if(kind === 'groan' && ok() && Math.random() < .5) clank(p); return; }
+  if(FASE >= 2){ if(kind === 'groan' && ok() && Math.random() < .5) clank(p); return; }
   if(!ok()) return;
   const v = VOICES[T && T.key] || VOICES.zumbi;
   if(SAMPLES.z_gemido1){
@@ -569,6 +599,12 @@ function victoryJingle(){
 /* Fase 2: barulho de metal (espada no escudo / portão) */
 function clank(p){ if(!ok()) return; const t = AC.currentTime, pan = panOf(p); [1.0, 2.76, 5.2].forEach((r, i) => tone('triangle', 520*r*rand(.95, 1.05), 0, .35 - i*.08, [.12, .06, .03][i], 0, pan, .3)); const n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'bandpass'; f.frequency.value = 3200; env(g, t, .001, .2, .06); n.connect(f).connect(g); out(g, pan, .2); n.start(t, Math.random()); n.stop(t + .1); }
 /* corneta real: chegada do mensageiro no castelo */
+// trompa viking: grave, longa e com um leve vibrato
+function vikingHorn(){ if(!ok()) return; const t = AC.currentTime; [[98, 0, 1.4], [110, 1.5, 1.9]].forEach(([f, d, l]) => [0, 5, -6].forEach(det => { const o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain(), lf = AC.createOscillator(), lg = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.setValueAtTime(f*.94, t + d); o.frequency.linearRampToValueAtTime(f, t + d + .25); o.detune.value = det; lf.frequency.value = 5; lg.gain.value = 3; lf.connect(lg).connect(o.detune);
+  lp.type = 'lowpass'; lp.frequency.setValueAtTime(300, t + d); lp.frequency.linearRampToValueAtTime(900, t + d + .3); lp.frequency.linearRampToValueAtTime(500, t + d + l);
+  g.gain.setValueAtTime(.0001, t + d); g.gain.exponentialRampToValueAtTime(.09, t + d + .2); g.gain.setValueAtTime(.09, t + d + l*.8); g.gain.exponentialRampToValueAtTime(.0001, t + d + l);
+  o.connect(lp).connect(g); out(g, 0, .5); o.start(t + d); o.stop(t + d + l + .05); lf.start(t + d); lf.stop(t + d + l + .05); })); }
 function fanfareHorn(){ if(!ok()) return; [[523, 0, .18], [523, .2, .18], [659, .4, .18], [784, .6, .6]].forEach(([f, d, l]) => { [0, 7].forEach(det => { const t = AC.currentTime + d, o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det; lp.type = 'lowpass'; lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(3200, t + .06); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.08, t + .04); g.gain.setValueAtTime(.08, t + l*.8); g.gain.exponentialRampToValueAtTime(.0001, t + l + .05); o.connect(lp).connect(g); out(g, 0, .4); o.start(t); o.stop(t + l + .1); }); }); }
 function horn(){ if(!ok()) return; [0, .22].forEach(d => { [349, 440].forEach(f => { const t = AC.currentTime + d, o = AC.createOscillator(), lp = AC.createBiquadFilter(), g = AC.createGain(); o.type = 'square'; o.frequency.value = f; lp.type = 'lowpass'; lp.frequency.value = 1400; env(g, t, .01, .09, .16); o.connect(lp).connect(g); out(g, .3, .2); o.start(t); o.stop(t + .25); }); }); }
 function fireworkSnd(p){
@@ -707,7 +743,7 @@ function toonOf(m, zombie){
 const manager = new THREE.LoadingManager();
 manager.onProgress = (u, a, b) => { $('loadFill').style.width = Math.round(a/b*100) + '%'; };
 const loader = new GLTFLoader(manager);
-const FILES = FASE === 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props'];
+const FILES = FASE >= 2 ? ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props', 'props2'] : ['anims', 'Barbarian', 'Knight', 'Rogue', 'Rogue_Hooded', 'Mage', 'props'];
 const GL = {};
 const KEEP = /Body|Arm|Leg|Head|Hat|Helmet|Cape|Cloak|Eyes|Jaw|Skull|Hood/;
 const TPL = {};
@@ -1046,6 +1082,7 @@ function box(w, h, d, color, r = .04, extra){ return new THREE.Mesh(new RoundedB
 function at(m, x, y, z, parent){ m.position.set(x, y, z); (parent || world).add(m); return m; }
 
 function buildGround(){
+  if(FASE === 3) return buildSea();
   const grass = canvasTex(1024, 1024, (g, w, h) => {
     g.fillStyle = '#7cc35b'; g.fillRect(0, 0, w, h); const r = rng(5);
     for(let i=0;i<900;i++){ g.fillStyle = r() < .5 ? 'rgba(60,130,50,.35)' : 'rgba(170,220,110,.35)'; const x = r()*w, y = r()*h; g.beginPath(); g.ellipse(x, y, 3 + r()*9, 2 + r()*5, r()*3, 0, 6.3); g.fill(); }
@@ -1175,6 +1212,167 @@ function buildProps2(){
   [[-4.6, 3.6], [4.7, 3.9], [-5.6, -2.4], [5.4, -2.0]].forEach(([x, z]) => put('rock', x, z, 1.5, rand(0, 6)));
   put('tree', -2.4, 4.8, 1.4); put('tree', 2.6, 4.6, 1.3);
 }
+/* ===== Fase 3: o mar, o navio inglês (centro) e os barcos vikings — tudo feito em código ===== */
+const DECK = 1.0;
+const shipTop = x => 1.0 + (x > 1.6 ? .32*Math.pow((x - 1.6)/1.7, 2) : x < -1.8 ? .26*Math.pow((-1.8 - x)/1.1, 2) : 0);
+const shipBot = x => -.45 + (x > 1.8 ? 1.3*Math.pow((x - 1.8)/1.5, 2) : x < -2.2 ? .5*Math.pow((-2.2 - x)/.7, 2) : 0);
+const shipHW = x => Math.max(.04, x > 1.4 ? 1 - .96*Math.pow(Math.min(1, (x - 1.4)/1.9), 1.7) : x < -1.8 ? 1 - .42*((-1.8 - x)/1.1) : 1);
+// casco em seções "U" ao longo de x (proa em +x); cores por vértice
+function loftHull(x0, x1, top, bot, hw, N, M, colorAt, transom){
+  const pos = [], col = [], idx = [], c = new THREE.Color();
+  for(let i=0;i<=N;i++){ const x = x0 + (x1 - x0)*i/N, t = top(x), b = bot(x), w = hw(x);
+    for(let j=0;j<=M;j++){ const a = Math.PI*j/M, sn = Math.sin(a), y = t - (t - b)*Math.pow(sn, .7), z = -w*Math.cos(a);
+      pos.push(x, y, z); c.setHex(colorAt(y, x, t)); col.push(c.r, c.g, c.b); } }
+  for(let i=0;i<N;i++) for(let j=0;j<M;j++){ const a = i*(M + 1) + j, b = a + M + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+  if(transom){ const base = pos.length/3, x = x0, t = top(x), b = bot(x); pos.push(x, (t + b)/2, 0); c.setHex(transom); col.push(c.r, c.g, c.b);
+    for(let j=0;j<M;j++) idx.push(base, j + 1, j); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
+  // garante normais para fora (o contorno de desenho usa as faces de trás)
+  const k = Math.round(N/2)*(M + 1) + 1, nz = g.attributes.normal.getZ(k);
+  if(nz > 0){ for(let i=0;i<idx.length;i+=3){ const q = idx[i + 1]; idx[i + 1] = idx[i + 2]; idx[i + 2] = q; } g.setIndex(idx); g.computeVertexNormals(); }
+  return g;
+}
+const hullMat = () => new THREE.MeshToonMaterial({vertexColors:true, gradientMap:GRAD, side:THREE.DoubleSide});
+// faixa vertical (amurada) acompanhando o contorno do casco
+function bulwark(x0, x1, top, hw, hgt, N, sd){
+  const pos = [], idx = [];
+  for(let i=0;i<=N;i++){ const x = x0 + (x1 - x0)*i/N, t = top(x), w = hw(x)*sd; pos.push(x, t - .02, w, x, t + hgt, w*.985); }
+  for(let i=0;i<N;i++){ const a = i*2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+const seaU = {value:0};
+let seaTex = null, foam = null;
+function buildSea(){
+  seaTex = canvasTex(512, 512, (g, w, h) => {
+    g.fillStyle = '#2f8fc9'; g.fillRect(0, 0, w, h); const r = rng(7);
+    for(let i=0;i<300;i++){ g.strokeStyle = r() < .55 ? 'rgba(255,255,255,.32)' : 'rgba(20,80,140,.3)'; g.lineWidth = 2 + r()*3; const x = r()*w, y = r()*h, l = 12 + r()*34;
+      g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + l/2, y - 6, x + l, y); g.stroke(); }
+  }, [7, 7]);
+  const m = new THREE.MeshToonMaterial({map:seaTex, gradientMap:GRAD});
+  m.onBeforeCompile = sh => { sh.uniforms.uT = seaU; sh.vertexShader = 'uniform float uT;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    transformed.y += sin(position.x*1.3 + uT*1.5)*.045 + cos(position.z*1.05 + uT*1.15)*.045;`); };
+  m.customProgramCacheKey = () => 'sea'; m.userData.outlineParameters = {visible:false};
+  const top = new THREE.Mesh(new THREE.RingGeometry(.01, 9.5, 120, 34).rotateX(-Math.PI/2), m);
+  world.add(top); RAYS.push(top); top.userData.ground = true;
+  const side = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.3, .7, 96, 1, true), mat(0x1f5f8c, {side:THREE.DoubleSide})); side.position.y = -.35; world.add(side);
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(9.3, 96).rotateX(Math.PI/2), mat(0x163f5e)); bottom.position.y = -.7; world.add(bottom);
+}
+function sailTex(cross){ return canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#f2ead6'; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(160,140,110,.25)'; for(let x=0;x<w;x+=32) g.fillRect(x, 0, 2, h);
+  if(cross){ g.fillStyle = '#c8202a'; g.fillRect(w*.42, 0, w*.16, h); g.fillRect(0, h*.42, w, h*.16); } }); }
+function sail(wd, ht, tex, belly = .22){
+  const geo = new THREE.PlaneGeometry(wd, ht, 10, 8); geo.rotateY(Math.PI/2);   // vela de frente para +x (proa)
+  const p = geo.attributes.position; for(let i=0;i<p.count;i++){ const u = p.getZ(i)/wd + .5, v = p.getY(i)/ht + .5; p.setX(i, p.getX(i) + Math.sin(Math.PI*u)*Math.sin(Math.PI*v)*belly); }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, new THREE.MeshToonMaterial({map:tex, gradientMap:GRAD, side:THREE.DoubleSide}));
+}
+function buildShip(){
+  house = new THREE.Group(); world.add(house); FZ = 1.0; chimneyTop = null; door = new THREE.Object3D(); ENTRIES = [];
+  const H = house, x0 = -2.9, x1 = 3.3;
+  const hull = new THREE.Mesh(loftHull(x0, x1, shipTop, shipBot, shipHW, 44, 16, (y, x, t) => y > t - .2 ? 0x7a2c20 : y > t - .32 ? 0xe2c27a : y < -.05 ? 0x3e2a1c : 0x8a5a33, 0x6e4528), hullMat());
+  H.add(hull);
+  [1, -1].forEach(sd => { const b = new THREE.Mesh(bulwark(x0 + .02, x1 - .05, shipTop, shipHW, .2, 44, sd), mat(0x7a2c20, {side:THREE.DoubleSide})); H.add(b); });
+  // convés de tábuas
+  const sh = new THREE.Shape(); const xs = []; for(let i=0;i<=40;i++) xs.push(x0 + .03 + (x1 - x0 - .1)*i/40);
+  xs.forEach((x, i) => i ? sh.lineTo(x, shipHW(x)*.97) : sh.moveTo(x, shipHW(x)*.97)); xs.slice().reverse().forEach(x => sh.lineTo(x, -shipHW(x)*.97));
+  const plank = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#d8ab72'; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(110,70,35,.55)'; for(let y=0;y<h;y+=32) g.fillRect(0, y, w, 3); g.fillStyle = 'rgba(110,70,35,.35)'; for(let y=0;y<h;y+=32) g.fillRect(((y*37)%w), y, 3, 32); });
+  plank.wrapS = plank.wrapT = THREE.RepeatWrapping; plank.repeat.set(.5, .5);
+  const deck = new THREE.Mesh(new THREE.ShapeGeometry(sh).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:plank, gradientMap:GRAD, side:THREE.DoubleSide})); deck.position.y = DECK; deck.material.userData.outlineParameters = {visible:false}; H.add(deck);
+  // castelos de popa e de proa
+  const aft = box(1.15, .55, 1.65, 0xa86d3e, .05); aft.position.set(-1.95, DECK + .27, 0); H.add(aft);
+  const aftTop = box(1.25, .07, 1.75, 0x7a2c20, .03); aftTop.position.set(-1.95, DECK + .58, 0); H.add(aftTop);
+  [-.5, 0, .5].forEach(z => { const w = box(.05, .2, .16, 0x2b1d14, .02); w.position.set(-1.36, DECK + .3, z); H.add(w); const l = box(.03, .14, .1, 0xffd36b, .01, {emissive:0x806020}); l.position.set(-1.35, DECK + .3, z); H.add(l); });
+  [-1, 1].forEach(sd => { for(let i=0;i<5;i++){ const p = box(.05, .18, .05, 0xe2c27a, .02); p.position.set(-2.5 + i*.27, DECK + .7, sd*.84); H.add(p); } const r = box(1.2, .05, .06, 0x7a2c20, .02); r.position.set(-1.95, DECK + .8, sd*.84); H.add(r); });
+  const fwd = box(.9, .38, 1.2, 0xa86d3e, .05); fwd.position.set(2.0, DECK + .18, 0); H.add(fwd);
+  const fwdTop = box(1.0, .06, 1.3, 0x7a2c20, .03); fwdTop.position.set(2.0, DECK + .4, 0); H.add(fwdTop);
+  // mastros, vergas e velas com a cruz vermelha
+  const wood = 0x6b4426, cross = sailTex(true), plain = sailTex(false);
+  [[.35, 3.6, 2.0, 1.45, cross], [2.0, 2.7, 1.5, 1.05, plain], [-1.95, 2.3, 1.2, .9, cross]].forEach(([x, h, sw, shh, tx], i) => {
+    const base = i === 1 ? DECK + .43 : i === 2 ? DECK + .62 : DECK;
+    const ms = new THREE.Mesh(new THREE.CylinderGeometry(.06, .09, h, 10), mat(wood)); ms.position.set(x, base + h/2, 0); H.add(ms);
+    [.42, .8].forEach((f, k) => { const yy = base + h*f, w = sw*(k ? .82 : 1), ht = shh*(k ? .7 : 1);
+      const yd = new THREE.Mesh(new THREE.CylinderGeometry(.035, .035, w + .3, 8).rotateX(Math.PI/2), mat(wood)); yd.position.set(x + .05, yy + ht/2, 0); H.add(yd);
+      const s = sail(w, ht, tx); s.position.set(x + .06, yy, 0); s.rotation.y = .32; H.add(s); yd.rotation.y = .32; });
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(.5, .32), new THREE.MeshToonMaterial({map:cross, gradientMap:GRAD, side:THREE.DoubleSide})); fl.position.set(x - .26, base + h + .1, 0); fl.userData.flag = true; H.add(fl);
+  });
+  const nest = new THREE.Mesh(new THREE.CylinderGeometry(.2, .16, .18, 12), mat(wood)); nest.position.set(.35, DECK + 3.6*.9, 0); H.add(nest);
+  const bowsprit = new THREE.Mesh(new THREE.CylinderGeometry(.04, .06, 1.6, 8), mat(wood)); bowsprit.rotation.z = -1.15; bowsprit.position.set(3.55, 1.55, 0); H.add(bowsprit);
+  // carga no convés
+  [[.9, .55], [1.1, -.5], [-.6, .6]].forEach(([x, z]) => { const o = prop2('barrel', H); o.scale.setScalar(1.4); o.position.set(x, DECK, z); });
+  [[-.8, -.55], [1.3, .1]].forEach(([x, z]) => { const o = prop2('crate', H); o.scale.setScalar(1.3); o.position.set(x, DECK, z); o.rotation.y = rand(0, 1); });
+  // espuma em volta do casco
+  foam = new THREE.Mesh(new THREE.RingGeometry(.9, 1.15, 64).rotateX(-Math.PI/2), fxMat(0xffffff, .55)); foam.scale.set(3.25, 1, 1.15); foam.position.set(.15, .03, 0); H.add(foam);
+  H.traverse(o => { if(o.isMesh && o !== foam) RAYS.push(o); });
+}
+function buildProps3(){
+  // ilhotas com pedras e árvores, longe do navio
+  [[-7.0, -3.6, 1.0], [6.9, 3.4, .9], [2.5, -7.2, .7]].forEach(([x, z, s]) => {
+    const isl = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI*2, 0, Math.PI/2), mat(0xe6d29a)); isl.scale.set(s*1.1, s*.32, s*.9); isl.position.set(x, -.05, z); world.add(isl);
+    const t = prop2('treesA'); t.scale.setScalar(.75*s); t.position.set(x, s*.2, z);
+    const r = prop2('rock'); r.scale.setScalar(1.2*s); r.position.set(x + s*.6, .05, z + s*.4); r.rotation.y = rand(0, 6);
+  });
+}
+// barco viking: casco escuro, escudos coloridos dos lados, vela listrada e cabeça de dragão na proa
+let VBOAT = null, RBOAT = null;
+function boatParts(viking){
+  const G = new THREE.Group();
+  const top = x => .28 + (viking ? .32 : .12)*Math.pow(Math.abs(x)/.8, 3), bot = x => -.12 + .3*Math.pow(Math.abs(x)/.8, 2.2), hw = x => Math.max(.03, .34*(1 - Math.pow(Math.abs(x)/.84, 2)));
+  G.add(new THREE.Mesh(loftHull(-.8, .8, top, bot, hw, 22, 10, y => y > .2 ? (viking ? 0x4e3220 : 0x2f6fa8) : (viking ? 0x6a4529 : 0xe9e2cf)), hullMat()));
+  const floor = box(.9, .03, .38, 0x8a5a33, .01); floor.position.y = .03; G.add(floor);
+  if(viking){
+    const wd = mat(0x4e3220), green = mat(0x3f7a3a);
+    G.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(.78, .55, 0), V(.9, .78, 0), V(.86, .98, 0), V(.97, 1.07, 0)]), 12, .045, 6), wd));
+    const head = new THREE.Mesh(new THREE.ConeGeometry(.075, .24, 6).rotateZ(-Math.PI/2), green); head.position.set(1.07, 1.07, 0); G.add(head);
+    [-1, 1].forEach(sd => { const e = new THREE.Mesh(new THREE.SphereGeometry(.022, 8, 6), mat(0xffd34d)); e.position.set(1.0, 1.11, sd*.05); G.add(e); });
+    G.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([V(-.78, .55, 0), V(-.9, .8, 0), V(-.8, .95, 0), V(-.72, .86, 0)]), 12, .04, 6), wd));
+    const cols = [0xc23b2b, 0xf0c43a, 0x2f5fa8, 0xe9e2cf];
+    [-1, 1].forEach(sd => [-.45, -.15, .15, .45].forEach((x, i) => {
+      const sdm = new THREE.Mesh(new THREE.CylinderGeometry(.11, .11, .03, 14).rotateX(Math.PI/2), mat(cols[(i + (sd > 0 ? 0 : 2)) % 4])); sdm.position.set(x, top(x) - .03, sd*(hw(x) + .02)); G.add(sdm);
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(.03, 8, 6), mat(0x8e949b)); boss.position.set(x, top(x) - .03, sd*(hw(x) + .04)); G.add(boss); }));
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(.025, .03, 1.15, 8), wd); mast.position.set(-.05, .57, 0); G.add(mast);
+    const yd = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, .85, 6).rotateX(Math.PI/2), wd); yd.position.set(-.03, 1.08, 0); G.add(yd);
+    const st = canvasTex(128, 128, (g, w, h) => { for(let i=0;i<8;i++){ g.fillStyle = i % 2 ? '#f2ead6' : '#b8282c'; g.fillRect(i*w/8, 0, w/8, h); } });
+    const sl = sail(.8, .55, st, .14); sl.position.set(-.02, .8, 0); G.add(sl);
+  }
+  const parts = bake(G); parts.forEach(m => { m.userData.outlineParameters = m.material.userData.outlineParameters; });
+  return parts;
+}
+function makeBoat(viking){
+  const parts = viking ? (VBOAT || (VBOAT = boatParts(true))) : (RBOAT || (RBOAT = boatParts(false)));
+  const g = new THREE.Group(), inner = new THREE.Group(); inner.rotation.y = -Math.PI/2; g.add(inner);   // proa para +z (frente do personagem)
+  parts.forEach(p => { const o = new THREE.Mesh(p.geometry, p.material); o.frustumCulled = false; inner.add(o); });
+  return g;
+}
+// arco na mão esquerda dos arqueiros
+function addBow(A, h){
+  const m = A.m; m.updateMatrixWorld(true); const hs = m.getObjectByName('handslotl'); if(!hs) return;
+  const P = new THREE.Group(); P.quaternion.copy(hs.getWorldQuaternion(new THREE.Quaternion()).invert()); P.scale.setScalar(1/hs.getWorldScale(V()).x); hs.add(P);
+  const r = .36*h, a = Math.PI*.42;
+  const bow = new THREE.Mesh(new THREE.TorusGeometry(r, .018*h, 5, 16, a*2).rotateZ(-a).translate(-r, 0, 0).rotateY(-Math.PI/2), mat(0x6b4426));
+  const str = new THREE.Mesh(new THREE.CylinderGeometry(.004*h, .004*h, 2*r*Math.sin(a), 4).translate(r*Math.cos(a) - r, 0, 0).rotateY(-Math.PI/2), mat(0xe9e2cf));
+  P.add(bow, str);
+}
+// flecha dos arqueiros vikings em direção ao convés
+function enemyArrow(Z){
+  const from = Z.pos.clone().add(V(0, Z.T.h*.75, 0)), to = V(rand(-1.6, 1.4)*HS, (DECK + .05)*HS, rand(-.6, .6)*HS);
+  const m = makeArrow({kind:'arrow'}); m.scale.setScalar(.45); world.add(m); const prev = V(); let landed = false;
+  twang(false);
+  fx(m, 1.6, (f, k) => { const q = Math.min(1, f.t/.7); prev.copy(m.position);
+    m.position.lerpVectors(from, to, q); m.position.y += Math.sin(q*Math.PI)*.9;
+    if(q < 1 && prev.distanceToSquared(m.position) > 1e-8){ const ah = m.position.clone().add(m.position.clone().sub(prev)); m.lookAt(world.localToWorld(ah)); }
+    if(q >= 1 && !landed){ landed = true; thunk(to, false); puffs(to.clone(), 0xb08050, 3, .07, .4); houseShake = Math.max(houseShake, .12); } });
+}
+function boatSync(Z){
+  const b = Z.boat; if(!b) return; const t = G ? G.t : 0, bob = Math.sin(t*2.2 + Z.bph)*.035;
+  if(Z.inBoat && Z.state !== 'dead'){ b.position.set(Z.pos.x, bob, Z.pos.z); b.rotation.set(Math.sin(t*1.7 + Z.bph)*.04, Z.A.g.rotation.y, Math.sin(t*2.2 + Z.bph + 1)*.05); Z.A.g.position.y = Z.pos.y + Z.hy + bob; }
+  else if(Z.state !== 'dead') b.position.y = bob;
+}
+function splash(p, big){
+  for(let i=0;i<(big ? 14 : 7);i++){ const d = new THREE.Mesh(puffGeo, fxMat(0xe8f6ff, .9)); d.position.set(p.x, .05, p.z); const v = V(rand(-1, 1)*(big ? 1.6 : 1), rand(2.5, 4.5)*(big ? 1.3 : 1), rand(-1, 1)*(big ? 1.6 : 1)), sz = rand(.05, .1)*(big ? 1.5 : 1);
+    fx(d, .9, (f, k, dt) => { v.y -= 9*dt; d.position.addScaledVector(v, dt); d.scale.setScalar(sz*(1 - k*.5)); d.material.opacity = .9*(1 - k); }); }
+  const ring = new THREE.Mesh(ringGeo, fxMat(0xffffff, .7)); ring.position.set(p.x, .06, p.z);
+  fx(ring, .8, (f, k) => { ring.scale.setScalar(.15 + k*(big ? 1.6 : .8)); ring.material.opacity = .7*(1 - k); });
+  if(ok()){ const t = AC.currentTime, n = noise(), fl = AC.createBiquadFilter(), g = AC.createGain(); fl.type = 'lowpass'; fl.frequency.setValueAtTime(big ? 1400 : 2200, t); fl.frequency.exponentialRampToValueAtTime(300, t + .5); env(g, t, .005, big ? .7 : .4, .45); n.connect(fl).connect(g); out(g, panOf(p), .25); n.start(t, Math.random()); n.stop(t + .6); }
+}
 function propAt(name, x, z, s, ry = 0, y = 0){
   const o = GL.props.scenes[PROPS.indexOf(name)].clone(true);
   o.traverse(c => { if(c.isMesh) c.material = toonOf(c.material, false); });
@@ -1285,9 +1483,9 @@ function updateCine(dt){
   const c = cine; c.t += dt; c.cam.aspect = innerWidth/innerHeight; c.cam.updateProjectionMatrix();
   const half = 1.7, d = clamp(half/(Math.tan(23*Math.PI/180)*Math.min(1, c.cam.aspect)), 3.5, 10);
   const k = Math.min(1, c.t/2.2), e = 1 - Math.pow(1 - k, 3);   // aproximação suave
-  const dist = d*(1.9 - .9*e), sway = Math.sin(c.t*.6)*.35*e, z0 = FZ*HS + 1.4;
-  c.cam.position.set(Math.sin(sway)*dist, .55 + dist*.16, z0 + Math.cos(sway)*dist);
-  c.cam.lookAt(world.localToWorld(V(0, .75, z0)));   // lookAt já considera que a câmera é filha de "world"
+  const dist = d*(1.9 - .9*e), sway = Math.sin(c.t*.6)*.35*e, z0 = FASE === 3 ? .1*HS : FZ*HS + 1.4, cy = FASE === 3 ? DECK*HS + .45 : 0;
+  c.cam.position.set(Math.sin(sway)*dist, cy + .55 + dist*.16, z0 + Math.cos(sway)*dist);
+  c.cam.lookAt(world.localToWorld(V(0, cy + .75, z0)));   // lookAt já considera que a câmera é filha de "world"
 }
 function endCine(){
   if(!cine) return; world.remove(cine.cam); scene.background = cine.bg; cine = null; POSTS.forEach(o => o.visible = true); document.body.classList.remove('cine');
@@ -1296,13 +1494,16 @@ function startParty(){
   endParty(); music(null);
   door.rotation.y = 1.5;
   const fam = [
-    {key:FASE === 2 ? 'Knight' : 'Barbarian', h:FASE === 2 ? 1.1 : 1.05, x:-.95, z:1.15, box:true},
+    {key:FASE >= 2 ? 'Knight' : 'Barbarian', h:FASE >= 2 ? 1.1 : 1.05, x:-.95, z:1.15, box:true},
     {key:'Mage', h:1.0, x:.95, z:1.15},
     {key:'Rogue', h:.72, x:0, z:1.8}
   ].map((m, i) => {
-    const A = actor(m.key, m.h, false); A.g.position.set(0, 0, FZ*HS - .2); A.g.visible = false; world.add(A.g);
+    const A = actor(m.key, m.h, false); A.g.visible = false; world.add(A.g);
     if(m.box){ const b = pizzaBox(); A.g.add(b); b.position.set(0, m.h*.4, .4); b.scale.setScalar(.85); A.box = b; }   // a pizza nas mãos, na altura do peito
-    return {A, home:V(m.x, 0, FZ*HS + m.z), out:.35 + i*.45, ph:i*.7, h:m.h, voice:['pai', 'mae', 'filho'][i], yell:0};
+    // fase 3: a tripulação comemora no convés do navio
+    const y0 = FASE === 3 ? DECK*HS : 0, home = FASE === 3 ? V(m.x*HS, 0, (m.z*.5 - .45)*HS) : V(m.x, 0, FZ*HS + m.z);
+    if(FASE === 3){ A.g.position.copy(home).setY(y0); A.shadow.visible = false; } else A.g.position.set(0, 0, FZ*HS - .2);
+    return {A, home, y0, out:.35 + i*.45, ph:i*.7, h:m.h, voice:['pai', 'mae', 'filho'][i], yell:0};
   });
   party = {t:0, fam, fwT:.2, cfT:0};
   setTimeout(() => { if(party) startCine(); }, 700);
@@ -1321,8 +1522,8 @@ function updateParty(dt){
     // comemoração de adulto: braços para cima (quem não está com a pizza) e um pulinho só na hora do grito
     if(m.yell <= 0 && m.yells < 2){ m.yells++; m.yell = rand(1.8, 3.5); m.big = .55; cheerVoice(m.voice, A.g.position); }
     A.play(A.box ? 'Idle' : 'Cheer', {ts:A.box ? 1 : .8});
-    if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.55; A.g.position.y = Math.sin(q*Math.PI)*(A.box ? .15 : .28)*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.25)); }
-    else { A.g.position.y = 0; A.shadow.scale.setScalar(m.h); }
+    if(m.big > 0){ m.big -= dt; const q = 1 - m.big/.55; A.g.position.y = m.y0 + Math.sin(q*Math.PI)*(A.box ? .15 : .28)*m.h; A.shadow.scale.setScalar(m.h*(1 - Math.sin(q*Math.PI)*.25)); }
+    else { A.g.position.y = m.y0; A.shadow.scale.setScalar(m.h); }
     A.g.rotation.y = Math.sin(t*1.1 + i*1.7)*.12;
   });
   P.fwT -= dt; if(P.fwT <= 0){ P.fwT = rand(.25, .55); firework(V(rand(-4.5, 4.5), rand(3.8, 6.5), rand(-3.5, 2.5))); }
@@ -1359,8 +1560,9 @@ function renderHUD(){
   $('wNext').textContent = nx ? 'Próxima arma em ' + (nx.kills - G.kills) + ' ' + (nx.kills - G.kills === 1 ? W.um : W.uns) : 'Arma máxima';
   const n = w.n;
   if(w.kind === 'arrow' || w.kind === 'fire'){ $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => '<g transform="translate(' + (i*6 - (Math.min(n, 3) - 1)*3) + ',' + (i*3) + ')"><path d="M6 34L30 10" stroke="#8a5a2b" stroke-width="3" stroke-linecap="round"/><path d="M30 10l-8 1 7 7z" fill="#cfd6dd"/><path d="M6 34l2-7M6 34l7-2" stroke="' + (w.kind === 'fire' ? '#ffc23a' : '#d8352a') + '" stroke-width="3"/>' + (w.kind === 'fire' ? '<circle cx="31" cy="9" r="4" fill="#ff8a2a"/>' : '') + '</g>').join(''); }
+  else if(w.kind === 'axe') $('wIcon').innerHTML = '<path d="M10 34L28 12" stroke="#6b4426" stroke-width="3.5" stroke-linecap="round"/><path d="M22 8c6-3 12 1 13 7-4-2-8-1-10 2z" fill="#cfd6dd" stroke="#fff" stroke-width="1"/>';
   else $('wIcon').innerHTML = Array.from({length:Math.min(n, 3)}, (_, i) => { const cx = n === 1 ? 18 : 10 + i*9, cy = n === 1 ? 23 : 25 - (i%2)*6, r = n === 1 ? (w.size > .2 ? 14 : 12) : 8;
-    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + hex(w.color) + '" stroke="#fff" stroke-width="1.5"/>'; }).join('') + '<circle cx="33" cy="7" r="3.5" fill="#ffd36b"/>';
+    return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + hex(w.color) + '" stroke="#fff" stroke-width="1.5"/>'; }).join('') + (w.kind === 'rock' ? '' : '<circle cx="33" cy="7" r="3.5" fill="#ffd36b"/>');
 }
 let bannerT = 0;
 function banner(title, sub, cls){
@@ -1386,7 +1588,7 @@ function setupScene(){
   scene.add(new THREE.HemisphereLight(0xfff4e0, 0x6a5a4a, 1.05));
   const sun = new THREE.DirectionalLight(0xffffff, 1.25); sun.position.set(-4, 9, 6); scene.add(sun);
   root = new THREE.Group(); world = new THREE.Group(); root.add(world);
-  buildGround(); if(FASE === 2){ buildCastle(); buildProps2(); } else { buildHouse(); buildProps(); }
+  buildGround(); if(FASE === 3){ buildShip(); buildProps3(); } else if(FASE === 2){ buildCastle(); buildProps2(); } else { buildHouse(); buildProps(); }
   marker = new THREE.Group(); markerRing = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 40), fxMat(0xffffff, .9)); marker.add(markerRing);
   const dot = new THREE.Mesh(new THREE.CircleGeometry(.08, 16), fxMat(0xff5a3c, 1)); dot.position.z = .01; marker.add(dot);
   marker.visible = false; world.add(marker);
@@ -1410,6 +1612,15 @@ const entryPos = e => e.p.clone().multiplyScalar(HS);
 /* ===== Abertura: motoboy entrega a pizza ===== */
 function startIntro(){
   cast = {t:0};
+  if(FASE === 3){
+    // um barquinho de entrega leva a pizza até o navio; o capitão recebe no convés
+    cast.walk = true; cast.v3 = true; cast.off = true;
+    cast.moto = makeBoat(false); cast.moto.rotation.y = Math.PI/2; cast.moto.position.set(-7.6, 0, 1.95*HS); world.add(cast.moto);
+    cast.rider = actor('Rogue', .95, false); cast.moto.add(cast.rider.g); cast.rider.shadow.visible = false; cast.rider.play('Idle');
+    cast.box = pizzaBox(); cast.rider.g.add(cast.box); cast.box.position.set(0, .62, .34);
+    cast.res = actor('Knight', 1.1, false); cast.res.g.visible = false; cast.res.shadow.visible = false; world.add(cast.res.g); cast.res.play('Idle');
+    return;
+  }
   if(FASE === 2){
     cast.walk = true; cast.off = true; cast.moto = new THREE.Group();
     cast.rider = actor('Rogue', 1.0, false); world.add(cast.rider.g); cast.rider.g.position.set(-6.8, 0, 5.4);
@@ -1429,7 +1640,22 @@ function moveTo(A, to, speed, dt, anim, ts){
   A.g.rotation.y = Math.atan2(dv.x, dv.z); A.play(anim || 'Walking_A', {ts:ts || 1});
   p.addScaledVector(dv, Math.min(1, speed*dt/dist)); return false;
 }
+function updateIntro3(dt){
+  const c = cast; c.t += dt; const t = c.t, stopX = -.35*HS, capP = V(-.35*HS, DECK*HS, .62*HS);
+  if(!c.rang){ const k = Math.min(1, t/3.2); c.moto.position.x = -7.6 + (stopX + 7.6)*(1 - Math.pow(1 - k, 2)); c.moto.position.y = Math.sin(t*2.4)*.03; c.moto.rotation.z = Math.sin(t*1.9)*.04;
+    if(k >= 1){ c.rang = t; fanfareHorn(); c.rider.g.rotation.y = Math.PI/2; c.res.g.visible = true; c.res.g.position.copy(capP); c.res.g.rotation.y = 0; } }
+  if(c.rang && !c.toss && t > c.rang + .9){   // a caixa vai do barquinho para as mãos do capitão
+    c.toss = t; const p0 = V(); c.box.getWorldPosition(p0); world.worldToLocal(p0); c.rider.g.remove(c.box); world.add(c.box); c.box.position.copy(p0); c.boxFrom = p0; c.rider.play('Throw', {once:true}); }
+  if(c.toss && !c.got){ const k = Math.min(1, (t - c.toss)/.6), to = capP.clone().add(V(0, .62, .34));
+    c.box.position.lerpVectors(c.boxFrom, to, k); c.box.position.y += Math.sin(k*Math.PI)*.6; c.box.rotation.y = k*Math.PI*2;
+    if(k >= 1){ c.got = t; world.remove(c.box); c.res.g.add(c.box); c.box.position.set(0, .62, .34); c.box.rotation.set(0, 0, 0); c.res.play('Cheer'); sample('arma', .6, 1.2, 0, .2); } }
+  if(c.got && t > c.got + 1.0){ c.rider.g.rotation.y = 0; c.rider.play('Idle'); const k = t - c.got - 1.0; c.moto.position.x = stopX + k*k*1.6; c.moto.position.y = Math.sin(t*2.4)*.03; if(c.moto.position.x > 8) c.moto.visible = false; }
+  if(c.got && t > c.got + 1.6 && !c.resIn){ if(moveTo(c.res, V(-.35*HS, 0, -.2*HS), 1.2, dt)){ c.resIn = t; c.res.g.visible = false; } c.res.g.position.y = DECK*HS; }
+  if(c.got && t > c.got + 2.0 && !c.smell){ c.smell = t; banner(W.Os + ' viram o navio com a pizza!', 'Proteja ' + W.casa, 'slime'); setTimeout(() => vikingHorn(), 300); }
+  if(c.smell && t > c.smell + 2.6) endIntro();
+}
 function updateIntro(dt){
+  if(cast && cast.v3) return updateIntro3(dt);
   const c = cast; c.t += dt; const t = c.t;
   const stopX = .9, doorP = V(0, 0, FZ*HS + .62), inside = V(0, 0, FZ*HS - .3);
   if(!c.walk && t < 3.2){ if(!engine) engineOn(true, 1.15); else engineOn(true, t < 2.2 ? 1.15 : .8); }
@@ -1495,13 +1721,13 @@ function gestureTip(){
 function fireTutorialDone(){
   if(tutStep !== 'fire') return;
   LS.set('ztut', '1'); tutOff();
-  tip('Isso! Zumbi comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum entrar!');
+  tip('Isso! ' + W.um[0].toUpperCase() + W.um.slice(1) + ' comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum ' + (FASE === 3 ? 'subir no navio!' : 'entrar!'));
   setTimeout(() => { if(!tutStep){ $('tip').hidden = true; gestureTip(); } }, 3200);
 }
 function endIntro(){
   if(!cast) return;
   engineOn(false);
-  [cast.moto, cast.rider.g, cast.res.g].forEach(o => o.parent && o.parent.remove(o));
+  [cast.moto, cast.rider.g, cast.res.g, cast.box].forEach(o => o && o.parent && o.parent.remove(o));
   door.rotation.y = 0; cast = null;
   $('skip').hidden = true;
   mode = 'play'; showPlayHUD(true); music('game');
@@ -1510,19 +1736,35 @@ function endIntro(){
   for(let i=0;i<3;i++) setTimeout(() => G && mode === 'play' && spawn('zumbi', true), i*500);
   G.next = 2.5;
 }
-$('skip').addEventListener('click', () => { if(cast){ if(!cast.smell) banner(W.Os + ' sentiram o cheiro da pizza!', 'Proteja ' + W.casa, 'slime'); endIntro(); } });
+$('skip').addEventListener('click', () => { if(cast){ if(!cast.smell) banner(W.Os + (FASE === 3 ? ' viram o navio com a pizza!' : ' sentiram o cheiro da pizza!'), 'Proteja ' + W.casa, 'slime'); endIntro(); } });
 
 /* ===== Zumbis ===== */
 function spawn(typeKey, fromGrave){
   const T = TYPES[typeKey]; const key = pick(T.models);
-  const A = FASE === 2 ? actor(key, T.h, false, false, T.gear) : actor(key, T.h, !!T.zombie, true, null, T.looks ? pick(T.looks) : null);
+  const A = FASE >= 2 ? actor(key, T.h, false, false, T.gear) : actor(key, T.h, !!T.zombie, true, null, T.looks ? pick(T.looks) : null);
+  if(T.bow) addBow(A, T.h);
   let pos;
   if(GRAVES.length && (fromGrave || (!T.climb && Math.random() < .35))){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
   else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
   const extra = G ? post5k().extra : 0;
-  const Z = {T, typeKey, A, hp:T.hp + (T.strong && extra > .55 ? 1 : 0), spd:1 + .4*extra, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0};
+  const Z = {T, typeKey, A, hp:T.hp + (T.strong && extra > .55 ? 1 : 0), spd:1 + .4*extra, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0, bph:rand(0, 6.28)};
   const ang = Math.atan2(pos.z, pos.x);
-  if(FASE === 2){
+  if(FASE === 3){
+    // cada viking chega no seu barquinho; arqueiros param longe e atiram, os outros encostam no casco e sobem
+    Z.boat = makeBoat(true); world.add(Z.boat); Z.boat.position.copy(pos); Z.inBoat = true; A.shadow.visible = false;
+    if(T.archer){ const a = Math.atan2(pos.z, pos.x), r = rand(4.3, 5.1);
+      Z.segs = [{to:() => V(Math.cos(a)*r, 0, Math.sin(a)*r), sp:T.speed, anim:'Idle', ts:1}]; Z.final = 'shoot'; }
+    else {
+      const sz = Math.sign(pos.z) || 1, x = clamp(pos.x*.3 + rand(-.4, .4), -1.5, 1.3), hw = shipHW(x);
+      Z.segs = [
+        {to:() => V(x*HS, 0, sz*(hw*HS + .95)), sp:T.speed, anim:'Idle', ts:1},
+        {to:() => V(x*HS, 0, sz*(hw*HS + .22)), sp:.6, anim:T.walk, ts:T.ts},
+        {to:() => V(x*HS, (DECK + .12)*HS, sz*(hw + .06)*HS), sp:T.climbSp || .5, anim:'Running_C', ts:.6, face:'house', climb:true},
+        {to:() => V(x*HS, DECK*HS, sz*(hw - .35)*HS), sp:1.2, anim:'Jump_Full_Short', ts:1.4, hop:true, once:true}
+      ];
+      Z.final = 'inside'; Z.wall = true;
+    }
+  } else if(FASE === 2){
     // castelo: quem vem pelos lados (ou é escalador) sobe a muralha com escada; os outros atacam o portão mais perto
     const side = Math.abs(pos.x) > Math.abs(pos.z);
     if(T.climb || side || Math.random() < .25){
@@ -1561,11 +1803,11 @@ function spawn(typeKey, fromGrave){
     Z.segs = [{to:() => entryPos(best), sp:T.speed, anim:T.walk, ts:T.ts}];
     Z.final = 'break';
   }
-  A.g.position.copy(pos).setY(FASE === 2 ? 0 : -1.1*T.h); A.g.rotation.y = yawTo(pos, V());
-  if(FASE === 2){ Z.state = 'move'; } else A.play('Spawn_Ground_Skeletons', {once:true, fade:0});
+  A.g.position.copy(pos).setY(FASE >= 2 ? 0 : -1.1*T.h); A.g.rotation.y = yawTo(pos, V());
+  if(FASE >= 2){ Z.state = 'move'; } else A.play('Spawn_Ground_Skeletons', {once:true, fade:0});
   world.add(A.g); ZS.push(Z);
-  if(FASE === 2) startSeg(Z);
-  puffs(pos.clone().setY(.1), 0x8a6a48, 6, .22, .6);
+  if(FASE >= 2) startSeg(Z);
+  if(Z.boat) boatSync(Z); else puffs(pos.clone().setY(.1), 0x8a6a48, 6, .22, .6);
   if(Math.random() < .35) groan(pos, 'groan', T);
   if(T.hp > 1){ Z.bar = hpBar(); A.g.add(Z.bar); Z.bar.position.y = T.h + .35; drawBar(Z); }
   return Z;
@@ -1578,13 +1820,26 @@ function updateZombie(Z, dt){
   if(A.rest) A.rest.forEach(([b, q]) => b.quaternion.copy(q));   // sem isso o ajuste acumularia a cada quadro
   A.mixer.update(dt);
   if(A.bones) shamble(A, Z.t, Z.state === 'move' || Z.state === 'break');
+  if(Z.boat) boatSync(Z);
   if(Z.squash > 0){ Z.squash = Math.max(0, Z.squash - dt*4); const s = 1 + Math.sin(Z.squash*Math.PI)*.18; A.g.scale.set(s, 2 - s, s); }
   if(Z.state === 'rise'){
     const k = Math.min(1, Z.t/1.0); A.g.position.y = -1.1*T.h*(1 - k);
     if(k >= 1){ Z.state = 'move'; Z.t = 0; startSeg(Z); }
     return;
   }
-  if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play(T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); } return; }
+  if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play(T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); else if(Z.state === 'shoot') A.play('2H_Ranged_Aiming'); else if(Z.state === 'leave') A.play('Idle'); } return; }
+  if(Z.state === 'shoot'){   // arqueiro viking atirando no navio do barco
+    turn(A.g, yawTo(Z.pos, V()), dt); Z.shootT += dt; Z.volley -= dt;
+    if(Z.volley <= 0){ Z.volley = rand(1.3, 1.9); A.play('2H_Ranged_Shoot', {once:true, restart:true, fade:.1}); Z.pend = .3; Z.back = .9; }
+    if(Z.pend != null){ Z.pend -= dt; if(Z.pend <= 0){ Z.pend = null; enemyArrow(Z); } }
+    if(Z.back != null){ Z.back -= dt; if(Z.back <= 0){ Z.back = null; A.play('2H_Ranged_Aiming', {fade:.15}); } }
+    if(Z.shootT >= (T.shootT || 6.5) && mode === 'play'){ loseLife(Z, W.flechas); Z.state = 'leave'; Z.t = 0; A.play('Idle'); }
+    boatSync(Z); return;
+  }
+  if(Z.state === 'leave'){   // depois de acertar o navio, o arqueiro vai embora
+    const o = V(Z.pos.x, 0, Z.pos.z).normalize(); Z.pos.addScaledVector(o, dt*1.1); turn(A.g, Math.atan2(o.x, o.z), dt, 4); A.g.position.copy(Z.pos); boatSync(Z);
+    if(Math.hypot(Z.pos.x, Z.pos.z) > 9.3) removeZ(Z); return;
+  }
   if(Z.state === 'move'){
     const seg = Z.segs[Z.si], B = seg.to(), p = Z.pos;
     const dv = B.clone().sub(p), dist = dv.length(), step = (Z.spd || 1)*seg.sp*dt*(A.bones && !seg.climb && !seg.hop ? .45 + .9*Math.abs(Math.sin(Z.t*2.4 + A.ph)) : 1);
@@ -1596,7 +1851,8 @@ function updateZombie(Z, dt){
     else if(Math.hypot(dv.x, dv.z) > .02) turn(A.g, Math.atan2(dv.x, dv.z), dt);
     // separação entre zumbis no chão
     if(Z.si === 0 && p.y < .05) for(const o of ZS){ if(o === Z || o.state === 'dead' || o.pos.y > .05) continue; const dx = p.x - o.pos.x, dz = p.z - o.pos.z, dd = dx*dx + dz*dz; if(dd < .3 && dd > 1e-6){ const k = (.55 - Math.sqrt(dd))*dt*2; p.x += dx*k; p.z += dz*k; } }
-    A.g.position.set(p.x, p.y + Z.hy, p.z); A.shadow.visible = p.y < .05;
+    A.g.position.set(p.x, p.y + Z.hy, p.z); A.shadow.visible = p.y < .05 && !Z.boat;
+    if(Z.boat){ if(Z.inBoat && Z.si > 0) Z.inBoat = false; boatSync(Z); }
     return;
   }
   if(Z.state === 'break'){
@@ -1606,7 +1862,7 @@ function updateZombie(Z, dt){
     return;
   }
   if(Z.state === 'enter'){
-    const k = Math.min(1, Z.t/.5); A.g.scale.setScalar(Math.max(.01, 1 - k)); A.g.position.lerp(V(Z.pos.x*.6, .4, Z.pos.z*.6), dt*4);
+    const k = Math.min(1, Z.t/.5); A.g.scale.setScalar(Math.max(.01, 1 - k)); A.g.position.lerp(V(Z.pos.x*.6, FASE === 3 ? DECK*HS : .4, Z.pos.z*.6), dt*4);
     if(k >= 1) removeZ(Z); return;
   }
   if(Z.state === 'chimney'){
@@ -1616,6 +1872,7 @@ function updateZombie(Z, dt){
   if(Z.state === 'dead'){
     if(Z.fall){ Z.fall.v.y -= 12*dt; Z.pos.addScaledVector(Z.fall.v, dt); if(Z.pos.y <= 0){ Z.pos.y = 0; Z.fall = null; } A.g.position.copy(Z.pos); }
     if(Z.t > 1.4){ A.g.position.y = Z.pos.y - (Z.t - 1.4)*.9; }
+    if(Z.boat && Z.inBoat && Z.t > .7){ Z.boat.position.y = -(Z.t - .7)*.45; Z.boat.rotation.z += dt*.25; }   // o barco afunda junto
     if(Z.t > 2.2) removeZ(Z);
   }
 }
@@ -1625,11 +1882,13 @@ function arrive(Z){
   Z.t = 0;
   if(Z.final === 'break'){ Z.state = 'break'; Z.breakT = 0; Z.A.play(Z.T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); if(Math.random() < .6) groan(Z.pos, 'groan', Z.T); }
   else if(Z.final === 'inside') enterHouse(Z);
+  else if(Z.final === 'shoot'){ Z.state = 'shoot'; Z.shootT = 0; Z.volley = .5; Z.A.play('2H_Ranged_Aiming'); }
   else { Z.state = 'chimney'; loseLife(Z, W.subiu); }
 }
 function enterHouse(Z){ Z.state = 'enter'; Z.t = 0; loseLife(Z, Z.wall ? W.subiu : W.entrou); puffs(Z.pos.clone().setY(.6), 0xc39a6b, 8, .18); }
 function dropLadder(Z){ if(Z.ladM){ const m = Z.ladM; Z.ladM = null; setTimeout(() => house.remove(m), 600); } }
-function removeZ(Z){ dropLadder(Z); world.remove(Z.A.g); Z.state = 'gone'; Z.A.mixer.stopAllAction(); const i = ZS.indexOf(Z); if(i >= 0) ZS.splice(i, 1); }
+function removeZ(Z){ dropLadder(Z);
+  if(Z.boat){ const b = Z.boat; Z.boat = null; const y0 = b.position.y; fx(b, 1.6, (f, k) => { b.position.y = y0 - k*.7; b.rotation.z += .004; }); } world.remove(Z.A.g); Z.state = 'gone'; Z.A.mixer.stopAllAction(); const i = ZS.indexOf(Z); if(i >= 0) ZS.splice(i, 1); }
 function loseLife(Z, msg){
   if(mode !== 'play') return;
   G.lives--; G.lost++; ouch(); renderHUD();
@@ -1657,7 +1916,7 @@ function kill(Z){
   G.score += Z.T.pts; G.kills++; if(Z.T.strong) G.strong++;
   popup('+' + Z.T.pts, V(Z.pos.x, Z.pos.y + Z.T.h + .2, Z.pos.z), Z.T.strong ? 'big' : '');
   const nx = WEAPONS[G.w + 1];
-  if(nx && G.kills >= nx.kills){ G.w++; levelUp(); showWeapon(); banner('Nova arma: ' + nx.name + '!', 'Explosão ' + (nx.n > 1 ? 'com ' + nx.n + ' bombas' : 'maior'), ''); }
+  if(nx && G.kills >= nx.kills){ G.w++; levelUp(); showWeapon(); banner('Nova arma: ' + nx.name + '!', FASE === 1 ? 'Explosão ' + (nx.n > 1 ? 'com ' + nx.n + ' bombas' : 'maior') : (nx.n > 1 ? nx.n + ' de uma vez' : 'Mais forte'), ''); }
   renderHUD();
   if(G.score >= G.goal) gameOver(true);
 }
@@ -1690,12 +1949,30 @@ function fire(ndc){
     const off = i === 0 ? V() : V(Math.cos(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1), 0, Math.sin(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1));
     const to = T0.clone().add(off); if(i > 0) to.y = Math.max(0, i && hit.ground ? 0 : to.y);
     const from = start.clone().lerp(to, .55); from.y = Math.max(from.y, to.y + 1.5);
-    const arrow = w.kind === 'arrow' || w.kind === 'fire';
-    const m = arrow ? makeArrow(w) : makeBomb(w); m.position.copy(from); world.add(m);
+    const arrow = w.kind === 'arrow' || w.kind === 'fire' || w.kind === 'axe';
+    const m = w.kind === 'axe' ? makeAxe() : w.kind === 'rock' ? makeRock(w) : arrow ? makeArrow(w) : makeBomb(w); m.position.copy(from); world.add(m);
     const dist = from.distanceTo(to);
     BOMBS.push({m, from, to, t:-i*.08, dur:arrow ? clamp(.16 + dist*.018, .18, .4) : clamp(.28 + dist*.03, .3, .65), w, arc:arrow ? clamp(dist*.07, .15, .7) : clamp(dist*.25, .6, 2.2), arrow});
   }
   if(w.kind === 'arrow' || w.kind === 'fire') twang(w.kind === 'fire'); else whoosh();
+}
+/* ===== Pedras e machados (fase 3) ===== */
+const rockGeo = new THREE.IcosahedronGeometry(1, 0);
+function makeRock(w){ const m = new THREE.Mesh(rockGeo, mat(w.color)); m.scale.set(w.size, w.size*.85, w.size*.95); return m; }
+function makeAxe(){
+  const g = new THREE.Group(), s = .9;
+  const hd = new THREE.Mesh(new THREE.CylinderGeometry(.025, .03, .55, 6), mat(0x6b4426)); g.add(hd);
+  const bl = box(.04, .2, .2, 0xb9c1c9, .02); bl.position.set(0, .2, .1); g.add(bl);
+  const ed = box(.045, .24, .04, 0xe8edf2, .01); ed.position.set(0, .2, .21); g.add(ed);
+  g.scale.setScalar(s); return g;
+}
+function rockLand(p, w){
+  const water = FASE === 3 && p.y < .08 && Math.hypot(p.x, p.z) < 9.5;
+  if(water) splash(p, w.R > 1.5); else puffs(p.clone().setY(p.y + .1), 0x9a8f80, w.R > 1.5 ? 12 : 7, w.R > 1.5 ? .22 : .14, .7);
+  const ring = new THREE.Mesh(ringGeo, fxMat(0xffffff, .6)); ring.position.set(p.x, p.y + .06, p.z); fx(ring, .5, (f, k) => { ring.scale.setScalar(w.R*(.3 + k*.9)); ring.material.opacity = .6*(1 - k); });
+  sample('quebra', w.R > 1.5 ? .9 : .6, rand(.7, .9), panOf(p), .25); tone('sine', 120, 45, .25, w.R > 1.5 ? .5 : .3, 0, panOf(p), .1);
+  if(w.R > 1.5) shake = Math.max(shake, .25);
+  for(const Z of ZS.slice()){ const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5; if(c.distanceTo(p) < w.R + .25*Z.T.h) damage(Z, w.dmg, p); }
 }
 function updateBombs(dt){
   for(let i=BOMBS.length-1;i>=0;i--){
@@ -1703,10 +1980,12 @@ function updateBombs(dt){
     const k = Math.min(1, b.t/b.dur);
     const prev = b.m.position.clone();
     b.m.position.lerpVectors(b.from, b.to, k); b.m.position.y += Math.sin(k*Math.PI)*b.arc;
-    if(b.arrow){ const ahead = b.m.position.clone().add(b.m.position.clone().sub(prev)); if(ahead.distanceToSquared(b.m.position) > 1e-8) b.m.lookAt(world.localToWorld(ahead));
+    if(b.w.kind === 'axe'){ b.m.rotation.x -= dt*22; const d = b.to.clone().sub(b.from); b.m.rotation.y = Math.atan2(d.x, d.z); }
+    else if(b.w.kind === 'rock'){ b.m.rotation.x += dt*7; b.m.rotation.z += dt*4; }
+    else if(b.arrow){ const ahead = b.m.position.clone().add(b.m.position.clone().sub(prev)); if(ahead.distanceToSquared(b.m.position) > 1e-8) b.m.lookAt(world.localToWorld(ahead));
       if(b.w.kind === 'fire'){ b.m.userData.flame.scale.setScalar(.6 + Math.random()*.5); if(Math.random() < .6) puffs(b.m.position.clone(), 0xff9a3a, 1, .06, .2); } }
-    else { b.m.rotation.x += dt*10; b.m.rotation.z += dt*6; b.m.userData.spark.scale.setScalar(.22 + Math.random()*.18); }
-    if(k >= 1){ BOMBS.splice(i, 1); if(b.arrow) arrowLand(b); else { world.remove(b.m); explode(b.to, b.w); } }
+    else if(b.m.userData.spark){ b.m.rotation.x += dt*10; b.m.rotation.z += dt*6; b.m.userData.spark.scale.setScalar(.22 + Math.random()*.18); }
+    if(k >= 1){ BOMBS.splice(i, 1); if(b.arrow) arrowLand(b); else if(b.w.kind === 'rock'){ world.remove(b.m); rockLand(b.to, b.w); } else { world.remove(b.m); explode(b.to, b.w); } }
   }
 }
 /* ===== Flechas (fase 2) ===== */
@@ -1724,12 +2003,13 @@ const BURNS = [];
 function arrowLand(b){
   const p = b.to, w = b.w;
   // a flecha fica cravada um instante
-  b.m.position.copy(p); const m = b.m; fx(m, 1.1, (f, k) => { m.scale.setScalar(.85*(k > .7 ? (1 - k)/.3 : 1)); });
-  if(w.kind === 'arrow'){
+  b.m.position.copy(p); const m = b.m, s0 = m.scale.x; fx(m, 1.1, (f, k) => { m.scale.setScalar(s0*(k > .7 ? (1 - k)/.3 : 1)); });
+  const wet = FASE === 3 && p.y < .08 && Math.hypot(p.x, p.z) < 9.5;
+  if(w.kind === 'arrow' || w.kind === 'axe'){
     let best = null, bd = w.R + .3;
     for(const Z of ZS){ if(['dead', 'gone', 'enter', 'chimney', 'party'].includes(Z.state)) continue; const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5; const d = c.distanceTo(p) - Z.T.h*.25; if(d < bd){ bd = d; best = Z; } }
-    puffs(p.clone().setY(p.y + .05), 0xb59a72, 3, .08, .4);
-    if(best){ damage(best, w.dmg, p); thunk(p, true); } else thunk(p, false);
+    if(wet && !best) splash(p, false); else puffs(p.clone().setY(p.y + .05), 0xb59a72, 3, .08, .4);
+    if(best){ damage(best, w.dmg, p); thunk(p, true); if(w.kind === 'axe') sample('impacto', .5, 1.6, panOf(p), .1); } else if(!wet) thunk(p, false);
     return;
   }
   // flecha de fogo: pequena explosão e chamas no chão que queimam por 3 s
@@ -1780,7 +2060,7 @@ function director(dt){
   if(G.gT <= 0){ G.gT = rand(1.4, 3.2); const w = ZS.filter(z => z.state === 'move' || z.state === 'break'); if(w.length){ const z = pick(w); groan(z.pos, 'groan', z.T); } }
   const interval = Math.max(.45, 2.5 - 1.75*ramp - .3*extra), maxAlive = 4 + Math.round(10*ramp + 6*extra);
   if(G.next <= 0 && alive < maxAlive){ spawn(pickType()); G.next = interval*rand(.6, 1.3); }
-  if(G.horde <= 0){ G.horde = rand(34, 44) - 10*extra; const n = 3 + Math.round(ramp*5 + extra*5); banner(W.horda, n + ' ' + W.uns + ' ao mesmo tempo', 'slime'); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
+  if(G.horde <= 0){ G.horde = rand(34, 44) - 10*extra; const n = 3 + Math.round(ramp*5 + extra*5); banner(W.horda, n + ' ' + W.uns + ' ao mesmo tempo', 'slime'); if(FASE === 3) vikingHorn(); for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
 }
 
 /* ===== Fluxo ===== */
@@ -1802,11 +2082,11 @@ function gameOver(won){
   if(mode !== 'play') return;
   mode = 'ending'; endWon = won; endT = won ? 8.5 : 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
   if(won){
-    banner(G.goal >= GOAL2 ? 'LENDA DA PIZZA!' : 'VITÓRIA!', G.goal >= GOAL2 ? '10.000 pontos! Ninguém segura essa família' : (FASE === 2 ? 'Castelo salvo! A família real vai comer a pizza' : 'Casa salva! A família vai comer a pizza'), 'win');
+    banner(G.goal >= GOAL2 ? 'LENDA DA PIZZA!' : 'VITÓRIA!', G.goal >= GOAL2 ? '10.000 pontos! Ninguém segura essa família' : (FASE === 3 ? 'Navio salvo! A tripulação vai comer a pizza' : FASE === 2 ? 'Castelo salvo! A família real vai comer a pizza' : 'Casa salva! A família vai comer a pizza'), 'win');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
     boom(true, null, 'dinamite'); startParty();
   } else {
-    banner(W.Os + (FASE === 2 ? ' roubaram a pizza!' : ' comeram a pizza!'), 'Tente de novo', 'slime');
+    banner(W.Os + (FASE >= 2 ? ' roubaram a pizza!' : ' comeram a pizza!'), 'Tente de novo', 'slime');
     ZS.forEach(Z => { if(Z.state === 'move' || Z.state === 'break' || Z.state === 'hit'){ Z.state = 'party'; Z.A.play(Math.random() < .5 ? 'Cheer' : 'Taunt'); } });
     music(null); tone('sawtooth', 233, 220, .45, .12, 0); tone('sawtooth', 220, 208, .45, .12, .5); tone('sawtooth', 208, 196, .45, .12, 1.0); tone('sawtooth', 196, 150, 1.3, .12, 1.5);
     groan(V(-2, 0, 0), 'groan', TYPES.zumbi); setTimeout(() => groan(V(2, 0, 0), 'groan', TYPES.gigante), 450);
@@ -1827,12 +2107,12 @@ function showEnd(){
   if(first){
     if(OWNER){ canGo = true; info = (G.test ? 'Modo teste. ' : '') + 'Você ganhou 1 ponto de fidelidade! Quer continuar até 10.000? Fica cada vez mais difícil.'; }
     else info = STICKER ? 'Este adesivo foi registrado por outro celular, então aqui o jogo vai só até 5.000. Peça uma pizza e registre o adesivo com o seu celular para ganhar pontos e jogar até 10.000.' : 'Sem adesivo o jogo vai até 5.000. Escaneie o adesivo da sua pizza e registre com o seu celular para jogar até 10.000.';
-  } else if(won) info = 'Você é a LENDA DA PIZZA! Mas ' + (FASE === 2 ? 'os invasores' : 'os zumbis') + ' não desistem: dizem que na próxima fase eles voltam em dobro... Que tal mais uma pizza para encarar o próximo desafio?';
+  } else if(won) info = 'Você é a LENDA DA PIZZA! Mas ' + W.Os.toLowerCase() + ' não desistem: dizem que na próxima fase eles voltam em dobro... Que tal mais uma pizza para encarar o próximo desafio?';
   $('eCont').hidden = !canGo;
-  $('eTitle').textContent = won ? (G.goal >= GOAL2 ? 'Lenda da pizza!' : W.Casa + ' salvo!'.replace('Casa salvo', 'Casa salva')) : W.Os + ' entraram';
+  $('eTitle').textContent = won ? (G.goal >= GOAL2 ? 'Lenda da pizza!' : W.Casa + ' salvo!'.replace('Casa salvo', 'Casa salva')) : (FASE === 3 ? 'Os vikings tomaram o navio' : W.Os + ' entraram');
   $('eStars').innerHTML = [0, 1, 2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
   $('eScore').textContent = fmt(G.score);
-  const lines = [[(FASE === 2 ? 'Invasores' : 'Zumbis') + ' derrotados', String(G.kills)], [(FASE === 2 ? 'Invasores' : 'Zumbis') + ' fortes (100 pts)', String(G.strong)], ['Vidas restantes', G.lives + ' de ' + LIVES], ['Melhor arma', WEAPONS[G.w].name]];
+  const lines = [[W.Inv + ' derrotados', String(G.kills)], [W.Inv + ' fortes (100 pts)', String(G.strong)], ['Vidas restantes', G.lives + ' de ' + LIVES], ['Melhor arma', WEAPONS[G.w].name]];
   if(!won) lines.unshift(['Faltaram', fmt(Math.max(0, G.goal - G.score)) + ' pontos']);
   $('eLines').innerHTML = lines.map(l => '<li><span>' + l[0] + '</span><span>' + l[1] + '</span></li>').join('');
   $('eInfo').hidden = !info; $('eInfo').textContent = info; $('eInfo').className = 'info ' + (won ? 'good' : '');
@@ -2067,6 +2347,9 @@ function loop(time, frame){
     if(party) updateParty(dt);
     updateFX(dt);
     if(houseShake > 0){ houseShake = Math.max(0, houseShake - dt); house.position.set(Math.sin(now/18)*.06*houseShake*2, 0, Math.cos(now/23)*.05*houseShake*2); } else house.position.set(0, 0, 0);
+    if(FASE === 3){ const ts = now/1000; seaU.value = ts; if(seaTex) seaTex.offset.set(ts*.012, ts*.007);   // mar e navio balançando
+      house.position.y += Math.sin(ts*.9)*.03*HS; house.rotation.x = Math.sin(ts*.7)*.018; house.rotation.z = Math.sin(ts*.55 + 1)*.01;
+      if(foam){ foam.material.opacity = .4 + Math.sin(ts*2.2)*.15; foam.scale.x = 3.25 + Math.sin(ts*1.3)*.05; } }
     if(shake > 0){ shake = Math.max(0, shake - dt*.8); world.position.set(rand(-1, 1)*shake*.25, 0, rand(-1, 1)*shake*.25); } else world.position.set(0, 0, 0);
     if(chimneyTop && Math.random() < dt*1.5 && mode !== 'menu'){ const s = new THREE.Mesh(puffGeo, mat(0xe8e4e0)); s.position.copy(chimneyTop).multiplyScalar(HS); const sz = rand(.1, .16);
       fx(s, 2, (f, k, d) => { s.position.y += d*.6; s.position.x += d*.15; s.scale.setScalar(sz*(1 + k*1.5)*(k > .8 ? (1 - k)*5 : 1)); }); }
