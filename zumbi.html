@@ -725,6 +725,16 @@ function toyMat(m, L, part, F){
   t.customProgramCacheKey = () => 'toy' + L.id + part;
   toonCache.set(k, t); return t;
 }
+function navyOf(m){
+  const k = m.uuid + 'navy'; if(toonCache.has(k)) return toonCache.get(k);
+  const t = new THREE.MeshToonMaterial({color:m.color, map:m.map, gradientMap:GRAD, side:m.side});
+  t.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    vec3 c = diffuseColor.rgb; float mx = max(c.r, max(c.g, c.b)), mn = min(c.r, min(c.g, c.b)), l = dot(c, vec3(.3,.59,.11));
+    float metal = step(mx - mn, .06) * step(.03, l);   // cinza da armadura vira casaca azul-marinho com detalhes dourados
+    vec3 navy = vec3(.03,.06,.2)*(.7 + 2.2*l), gold = vec3(.75,.55,.15);
+    diffuseColor.rgb = mix(c, mix(navy, gold, step(.55, l)), metal);`); };
+  t.customProgramCacheKey = () => 'navy'; toonCache.set(k, t); return t;
+}
 function toonOf(m, zombie){
   const k = m.uuid + (zombie ? 'z' : '');
   if(toonCache.has(k)) return toonCache.get(k);
@@ -758,12 +768,12 @@ function template(key, zombie, bare, gear, look){
   const b = new THREE.Box3();
   s.traverse(o => { if(o.isMesh){
     // inimigos ficam sem chapéu, capuz ou capacete: aparece a cabeça de zumbi / caveira
-    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare || (gear && FASE === 3)) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
+    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare || FASE === 3) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
     o.frustumCulled = false;
     if(o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); }
   } });
   const gh = Math.max(.5, b.max.y - b.min.y);
-  s.traverse(o => { if(o.isMesh) o.material = L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
+  s.traverse(o => { if(o.isMesh) o.material = FASE === 3 && key === 'Knight' && !gear ? navyOf(o.material) : L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
   const tpl = {scene:s, h:gh};
   if(zombie || FASE === 3){
     s.updateMatrixWorld(true);
@@ -966,10 +976,47 @@ function vikingHelmet(m, T, key){
   }
   T.helm.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
 }
+/* ===== Tripulação inglesa (fase 3): tricórnio de capitão, touca de dama e boné de marinheiro ===== */
+function englishHat(m, T, key){
+  const bone = m.getObjectByName('head'), face = T.face; if(!bone || !face) return;
+  const F = new THREE.Group(); F.position.copy(face.frame.pos); F.quaternion.copy(face.frame.quat); F.scale.setScalar(face.frame.s); bone.add(F);
+  if(!T.hatE){
+    const S = face.size, hx = S.x/2, hy = S.y/2, hz = S.z/2, u = S.x, G = new THREE.Group();
+    const add = (geo, mt, p, sc, r) => { const o = new THREE.Mesh(geo, mt); o.position.set(p[0], p[1], p[2]); if(sc.length) o.scale.set(sc[0], sc[1], sc[2]); else o.scale.setScalar(sc); if(r) o.rotation.set(r[0], r[1], r[2]); G.add(o); return o; };
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 24);
+    if(key === 'Knight'){   // tricórnio preto com galão dourado e roseta (oficial da Marinha Real)
+      const blk = mat(0x1f1d22), gold = mat(0xd4a83a), y0 = hy*.62;
+      add(cyl, blk, [0, y0 + hy*.22, -hz*.05], [hx*.92, hy*.42, hz*.95]);
+      add(cyl, blk, [0, y0, -hz*.05], [hx*1.25, hy*.05, hz*1.28]);
+      const R = hx*1.42, vs = [90, 210, 330].map(d => d*Math.PI/180).map(a => V(Math.cos(a)*R, 0, Math.sin(a)*R - hz*.05));
+      for(let i=0;i<3;i++){ const a = vs[i], b = vs[(i + 1)%3], mid = a.clone().add(b).multiplyScalar(.5), len = a.distanceTo(b), yaw = Math.atan2(b.x - a.x, b.z - a.z);
+        const w = add(cubeGeo, blk, [mid.x*.8, y0 + hy*.22, mid.z*.8], [u*.05, hy*.62, len*1.02]); w.rotation.set(0, yaw, 0); w.rotateZ(0); w.rotateOnAxis(V(0, 0, 1), 0);
+        const out = mid.clone().setY(0).normalize(); w.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(V(-out.z, 0, out.x), -.6));
+        const t = add(cubeGeo, gold, [mid.x*.8 + out.x*u*.2, y0 + hy*.5, mid.z*.8 + out.z*u*.2], [u*.06, u*.035, len*.95]); t.quaternion.copy(w.quaternion); }
+      add(cyl, mat(0xf4f1ea), [-hx*.45, y0 + hy*.35, hz*.62], [u*.1, u*.02, u*.1], [Math.PI/2, 0, .4]);
+      add(ballGeo, gold, [-hx*.45, y0 + hy*.35, hz*.66], u*.035);
+    } else if(key === 'Mage'){   // touca de dama com aba larga e fita
+      const straw = mat(0xe9d39a), rib = mat(0xc24e6e), y0 = hy*.5;
+      add(cyl, straw, [0, y0, hz*.08], [hx*1.55, hy*.04, hz*1.6], [-.12, 0, 0]);
+      add(capGeo, straw, [0, y0, -hz*.05], [hx*1.02, hy*.85, hz*1.05]);
+      add(bandGeo, rib, [0, y0 + hy*.1, -hz*.05], [hx*1.05, hy*.14, hz*1.08]);
+      [-1, 1].forEach(sx => add(ballGeo, rib, [sx*hx*.25, y0 + hy*.12, -hz*1.08], [u*.12, u*.07, u*.05]));
+      [-1, 1].forEach(sx => add(cubeGeo, rib, [sx*hx*.18, y0 - hy*.35, -hz*1.1], [u*.07, hy*.6, u*.02], [0, 0, sx*.2]));
+    } else {   // boné redondo de marinheiro, branco com faixa azul e fitinhas atrás
+      const wht = mat(0xf2f1ec), blu = mat(0x1f3a6e), y0 = hy*.6;
+      add(cyl, wht, [0, y0 + hy*.18, -hz*.05], [hx*1.12, hy*.12, hz*1.12]);
+      add(cyl, blu, [0, y0, -hz*.05], [hx*.98, hy*.22, hz*.98]);
+      [-1, 1].forEach(sx => add(cubeGeo, blu, [sx*hx*.12, y0 - hy*.3, -hz*1.0], [u*.08, hy*.55, u*.02], [0, 0, sx*.25]));
+    }
+    T.hatE = bake(G);
+  }
+  T.hatE.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
+}
 function actor(key, h, zombie, bare, gear, look){
   const T = template(key, zombie, bare, gear, look), m = skClone(T.scene);
   if(look != null) toyZombie(m, T, LOOKS[look]);
   else if(FASE === 3 && gear) vikingHelmet(m, T, key);
+  else if(FASE === 3) englishHat(m, T, key);
   else if(zombie && bare) zombieFace(m, T.face);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
@@ -2359,7 +2406,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => begin(false));
 
-window.ZG = {get owner(){ return OWNER; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {get owner(){ return OWNER; }, mk:(key, h, anim, x, ry = 0, gear)=>{ const A = actor(key, h, false, false, gear); A.g.position.set(x, 0, 3.6); A.g.rotation.y = ry; world.add(A.g); A.play(anim); setInterval(() => A.mixer.update(.016), 16); return 1; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
