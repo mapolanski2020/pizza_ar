@@ -1345,6 +1345,10 @@ function buildProps2(){
   put('rack', 3.2, -6.4, 3, .4); put('target', -3.4, -6.2, 2.4, -.3); put('barrel', 2.4, -5.6, 2.2); put('crate', -2.6, -5.5, 2);
   [[-4.6, 3.6], [4.7, 3.9], [-5.6, -2.4], [5.4, -2.0]].forEach(([x, z]) => put('rock', x, z, 1.5, rand(0, 6)));
   put('tree', -2.4, 4.8, 1.4); put('tree', 2.6, 4.6, 1.3);
+  [[-7.2, 2.5], [7.3, 2.2], [-6.6, -4.4], [6.8, -4.6], [-4.8, 6.8], [5.2, 6.9], [0, -8.4], [-8.4, -1], [8.4, -.8]].forEach(([x, z]) => obst(x, z, .95));
+  [[-2.0, -7.3], [0, -7.8], [2.1, -7.2]].forEach(([x, z]) => obst(x, z, .85));
+  obst(3.2, -6.4, .5); obst(-3.4, -6.2, .4); obst(2.4, -5.6, .3); obst(-2.6, -5.5, .35);
+  [[-4.6, 3.6], [4.7, 3.9], [-5.6, -2.4], [5.4, -2.0]].forEach(([x, z]) => obst(x, z, .55)); obst(-2.4, 4.8, .5); obst(2.6, 4.6, .5);
 }
 /* ===== Fase 3: o mar, o navio inglês (centro) e os barcos vikings — tudo feito em código ===== */
 const DECK = 1.0;
@@ -1448,6 +1452,7 @@ function buildProps3(){
     const isl = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI*2, 0, Math.PI/2), mat(0xe6d29a)); isl.scale.set(s*1.1, s*.32, s*.9); isl.position.set(x, -.05, z); world.add(isl);
     const t = prop2('treesA'); t.scale.setScalar(.75*s); t.position.set(x, s*.2, z);
     const r = prop2('rock'); r.scale.setScalar(1.2*s); r.position.set(x + s*.6, .05, z + s*.4); r.rotation.y = rand(0, 6);
+    obst(x, z, 1.15*s);
   });
 }
 // barco viking: casco escuro, escudos coloridos dos lados, vela listrada e cabeça de dragão na proa
@@ -1634,23 +1639,24 @@ function buildProps4(){
   GRAVES.push(V(-1.8, 0, -6.3), V(0, 0, -6.7), V(1.9, 0, -6.2));
   const hide = canvasTex(256, 128, (g, w, h) => { g.fillStyle = '#e8d5a8'; g.fillRect(0, 0, w, h); g.fillStyle = '#a8432c'; g.fillRect(0, h*.62, w, h*.08); g.fillStyle = '#2f6f8f'; for(let x=8;x<w;x+=32){ g.beginPath(); g.moveTo(x, h*.85); g.lineTo(x + 12, h*.73); g.lineTo(x + 24, h*.85); g.fill(); } g.fillStyle = '#a8432c'; g.fillRect(0, h*.9, w, h*.06); });
   [[-2.3, -7.4, 0], [0, -8.0, .3], [2.3, -7.3, -.2], [-4.2, -6.4, .5], [4.1, -6.3, -.4]].forEach(([x, z, r]) => {
+    obst(x, z, .78);
     const tp = new THREE.Mesh(new THREE.ConeGeometry(.75, 1.9, 14, 1, true), new THREE.MeshToonMaterial({map:hide, gradientMap:GRAD, side:THREE.DoubleSide})); tp.position.set(x, .95, z); tp.rotation.y = r; world.add(tp);
     for(let i=0;i<5;i++){ const a = i*1.26 + r, pole = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, .7, 5), mat(0x6e4526)); pole.position.set(x + Math.cos(a)*.08, 2.05, z + Math.sin(a)*.08); pole.rotation.set(Math.sin(a)*.35, 0, -Math.cos(a)*.35); world.add(pole); }
     const dr = new THREE.Mesh(new THREE.PlaneGeometry(.35, .5), mat(0x3a2414, {side:THREE.DoubleSide})); dr.position.set(x + Math.sin(r)*.42, .25, z + Math.cos(r)*.42); dr.rotation.y = r; dr.rotation.x = -.38; world.add(dr);
   });
   // fogueira
-  const fire = new THREE.Group(); fire.position.set(.9, 0, -5.6); world.add(fire);
+  const fire = new THREE.Group(); fire.position.set(.9, 0, -5.6); world.add(fire); obst(.9, -5.6, .35);
   for(let i=0;i<6;i++){ const st = new THREE.Mesh(new THREE.SphereGeometry(.1, 6, 5), mat(0x8d8a84)); st.position.set(Math.cos(i)*.25, .05, Math.sin(i)*.25); fire.add(st); }
   [0, 1, 2].forEach(i => { const f = new THREE.Mesh(coneGeo, i ? fireMatA : fireMatB); f.scale.set(1.2, .5 + i*.12, 1.2); f.position.set((i - 1)*.06, .05, 0); f.userData.h = .5 + i*.12; fire.add(f); });
   CAMPFIRE = fire;
   // cactos e rochas do deserto; morros ao fundo
-  const cactus = (x, z, s) => { const g = new THREE.Group(), cm = mat(0x4f8f3a); g.position.set(x, 0, z); g.scale.setScalar(s); world.add(g);
+  const cactus = (x, z, s) => { obst(x, z, .42*s); const g = new THREE.Group(), cm = mat(0x4f8f3a); g.position.set(x, 0, z); g.scale.setScalar(s); world.add(g);
     const tr = new THREE.Mesh(new THREE.CapsuleGeometry(.14, .9, 4, 8), cm); tr.position.y = .6; g.add(tr);
     [[-1, .55, .35], [1, .75, .3]].forEach(([sx, y, l]) => { const a = new THREE.Mesh(new THREE.CapsuleGeometry(.09, .2, 4, 8).rotateZ(Math.PI/2), cm); a.position.set(sx*.22, y, 0); g.add(a);
       const up = new THREE.Mesh(new THREE.CapsuleGeometry(.09, l, 4, 8), cm); up.position.set(sx*.36, y + l/2 + .05, 0); g.add(up); }); };
   [[-6.2, 2.6, 1], [6.4, 2.2, .9], [-5.0, 5.4, .8], [5.6, 5.0, 1.1], [-7.4, -1.6, .9], [7.2, -2.0, 1], [3.6, 7.2, .7]].forEach(([x, z, s]) => cactus(x, z, s));
-  [[-4.7, 3.6], [4.8, 3.9], [-5.6, -2.6], [5.5, -2.2]].forEach(([x, z]) => { const r = prop2('rock'); r.scale.setScalar(1.5); r.position.set(x, 0, z); r.rotation.y = rand(0, 6); });
-  [[-7.6, -4.8, 1.4], [7.4, -5.2, 1.2], [0, -9.0, 1.0]].forEach(([x, z, s]) => { const m = box(2.2*s, 1.3*s, 1.4*s, 0xc96f3c, .2); m.position.set(x, .65*s, z); world.add(m); const tp = box(2.0*s, .12*s, 1.25*s, 0xb35b2e, .05); tp.position.set(x, 1.33*s, z); world.add(tp); });
+  [[-4.7, 3.6], [4.8, 3.9], [-5.6, -2.6], [5.5, -2.2]].forEach(([x, z]) => { obst(x, z, .55); const r = prop2('rock'); r.scale.setScalar(1.5); r.position.set(x, 0, z); r.rotation.y = rand(0, 6); });
+  [[-7.6, -4.8, 1.4], [7.4, -5.2, 1.2], [0, -9.0, 1.0]].forEach(([x, z, s]) => { obst(x - .55*s, z, .78*s); obst(x + .55*s, z, .78*s); const m = box(2.2*s, 1.3*s, 1.4*s, 0xc96f3c, .2); m.position.set(x, .65*s, z); world.add(m); const tp = box(2.0*s, .12*s, 1.25*s, 0xb35b2e, .05); tp.position.set(x, 1.33*s, z); world.add(tp); });
 }
 let CAMPFIRE = null;
 // trajes: couro de camurça (indígenas)
@@ -1733,6 +1739,9 @@ function propAt(name, x, z, s, ry = 0, y = 0){
   o.scale.setScalar(s); o.rotation.y = ry; o.position.set(x, y, z); world.add(o); return o;
 }
 const GRAVES = [], POSTS = [];
+/* Obstáculos que os inimigos contornam (círculos no chão: x, z, raio) */
+const OBST = [];
+const obst = (x, z, r) => OBST.push({x, z, r});
 function buildProps(){
   [[-3, -5.2, .42, .2], [-4.7, -4.1, .4, .5], [-1.6, -6.6, .4, -.1], [1.4, -6.3, .42, .15], [3.2, -5.1, .4, -.3], [4.8, -3.9, .4, -.6]].forEach(([x, z, s, r], i) => { propAt(i%2 ? 'gravestone' : 'grave', x, z, s, r); GRAVES.push(V(x, 0, z + .55)); });
   [[-5.8, -6.2], [0, -7.8], [5.9, -5.9]].forEach(([x, z]) => propAt('marker', x, z, .4, rand(-.4, .4)));
@@ -1743,6 +1752,12 @@ function buildProps(){
     .forEach(([x, z, sc]) => { const o = propAt('pumpkin', x, z, sc, -Math.sign(x)*.25 + rand(-.15, .15)); POSTS.push(o, glowAt(o, sc)); });
   POSTS.push(propAt('postLantern', -1.0, 4.6, .5, Math.PI), propAt('postLantern', 1.0, 4.6, .5, 0));
   propAt('lantern', -2.1, -1.9, .5, 0); propAt('lantern', 2.2, 1.7, .5, 0);
+  [[-3, -5.2], [-4.7, -4.1], [-1.6, -6.6], [1.4, -6.3], [3.2, -5.1], [4.8, -3.9]].forEach(([x, z]) => obst(x, z, .36));   // lápides
+  [[-5.8, -6.2], [0, -7.8], [5.9, -5.9]].forEach(([x, z]) => obst(x, z, .3));
+  obst(-6.9, -2.6, .35); obst(6.9, -1.8, .4); obst(2.6, -7.9, .32); obst(-7.6, 2.4, .55); obst(7.7, 2.9, .6); obst(-3.3, -8.3, .45);
+  [-3.4, 4.2].forEach((x, i) => { const z = i ? -7.9 : -8.2; obst(x - .45, z, .3); obst(x, z, .3); obst(x + .45, z, .3); });   // cercas
+  [[-1.5, d2 + .8], [1.5, d2 + .8], [-1.6, d2 + 2.4], [1.6, d2 + 2.4]].forEach(([x, z]) => obst(x, z, .34));   // abóboras
+  obst(-1.0, 4.6, .16); obst(1.0, 4.6, .16); obst(-2.1, -1.9, .2); obst(2.2, 1.7, .2);
 }
 
 /* ===== Moto de entrega e caixa de pizza (feitas em código) ===== */
@@ -2102,6 +2117,10 @@ function spawn(typeKey, fromGrave){
   let pos;
   if(GRAVES.length && (fromGrave || (!T.climb && Math.random() < .35))){ const g = pick(GRAVES); pos = g.clone().add(V(rand(-.4, .4), 0, rand(0, .5))); }
   else { const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos = V(Math.cos(a)*r, 0, Math.sin(a)*r); }
+  // não nasce dentro de árvore, barraca, rocha ou morro: tenta outro ponto, ou empurra para fora
+  const blocked = q => OBST.some(o => Math.hypot(q.x - o.x, q.z - o.z) < o.r + .45);
+  for(let k=0;k<12 && blocked(pos);k++){ if(k < 8 && !(GRAVES.length && fromGrave)){ const a = rand(0, Math.PI*2), r = rand(8.2, 8.9); pos.set(Math.cos(a)*r, 0, Math.sin(a)*r); }
+    else for(const o of OBST){ const dx = pos.x - o.x, dz = pos.z - o.z, d = Math.hypot(dx, dz) || 1; if(d < o.r + .45){ pos.x = o.x + dx/d*(o.r + .5); pos.z = o.z + dz/d*(o.r + .5); } } }
   const extra = G ? post5k().extra : 0;
   const Z = {T, typeKey, A, hp:T.hp + (T.strong && extra > .55 ? 1 : 0), spd:1 + .4*extra, pos, state:'rise', t:0, segs:[], si:0, hy:0, blinkT:rand(2, 4), squash:0, bph:rand(0, 6.28)};
   const ang = Math.atan2(pos.z, pos.x);
@@ -2204,11 +2223,13 @@ function updateZombie(Z, dt){
     const seg = Z.segs[Z.si], B = seg.to(), p = Z.pos;
     const dv = B.clone().sub(p), dist = dv.length(), step = (Z.spd || 1)*seg.sp*dt*(A.bones && !seg.climb && !seg.hop ? .45 + .9*Math.abs(Math.sin(Z.t*2.4 + A.ph)) : 1);
     if(T.blink && Z.si === 0 && dist > 2.5){ Z.blinkT -= dt; if(Z.blinkT <= 0){ Z.blinkT = rand(2.5, 4); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); p.addScaledVector(dv, Math.min(.6, 1.6/dist)); puffs(p.clone().setY(.5), 0x9b6bff, 6, .2); } }
+    let dir = dv.clone().divideScalar(dist || 1);
+    if(!seg.climb && !seg.hop && p.y < .05 && B.y < .05 && dist > step) dir = steer(p, dir, dist, Z.boat ? .7 : .3*T.h + .05);
     if(dist <= step){ p.copy(B); Z.si++; if(Z.si >= Z.segs.length){ arrive(Z); return; } Z.segStart = p.clone(); startSeg(Z); }
-    else p.addScaledVector(dv, step/dist);
+    else p.addScaledVector(dir, step);
     if(seg.hop){ const L0 = Z.segStart ? Z.segStart.distanceTo(B) : 1; const f = 1 - Math.min(1, dist/L0); Z.hy = Math.sin(f*Math.PI)*.45*HS; } else Z.hy = 0;
     if(seg.face === 'house') turn(A.g, CASTLE ? (Z.lad ? Z.lad.ry : 0) : Math.atan2(0, -Math.sign(p.z)), dt);
-    else if(Math.hypot(dv.x, dv.z) > .02) turn(A.g, Math.atan2(dv.x, dv.z), dt);
+    else if(Math.hypot(dir.x, dir.z) > .02) turn(A.g, Math.atan2(dir.x, dir.z), dt);
     // separação entre zumbis no chão
     if(Z.si === 0 && p.y < .05) for(const o of ZS){ if(o === Z || o.state === 'dead' || o.pos.y > .05) continue; const dx = p.x - o.pos.x, dz = p.z - o.pos.z, dd = dx*dx + dz*dz; if(dd < .3 && dd > 1e-6){ const k = (.55 - Math.sqrt(dd))*dt*2; p.x += dx*k; p.z += dz*k; } }
     A.g.position.set(p.x, p.y + Z.hy, p.z); A.shadow.visible = p.y < .05 && !Z.boat;
@@ -2235,6 +2256,22 @@ function updateZombie(Z, dt){
     if(Z.boat && Z.inBoat && Z.t > 1.2){ Z.inBoat = false; Z.A.g.visible = false; boatSync(Z); }   // o barco vai embora boiando
     if(Z.t > 2.2) removeZ(Z);
   }
+}
+/* Desvio de obstáculos: se há algo no caminho à frente, vira para o lado mais livre; se encostou, é empurrado para fora */
+const SV = V();
+function steer(p, d, dist, ar){
+  SV.set(d.x, 0, d.z);
+  for(const o of OBST){
+    const rx = o.x - p.x, rz = o.z - p.z, R = o.r + ar, dd = Math.hypot(rx, rz);
+    if(dd > R + 1.4) continue;
+    if(dd < R){ const k = (R - dd)/R*3 + .5; SV.x -= rx/(dd || 1)*k; SV.z -= rz/(dd || 1)*k; continue; }   // dentro: sai
+    if(dist < dd - R) continue;                    // o destino vem antes do obstáculo
+    const ahead = rx*d.x + rz*d.z; if(ahead <= 0) continue;
+    const lat = rx*d.z - rz*d.x; if(Math.abs(lat) > R) continue;   // passa ao lado sem encostar
+    const w = (1 - Math.abs(lat)/R)*Math.min(1, (R + 1.4 - dd)/1.4)*2.2, sd = lat >= 0 ? 1 : -1;
+    SV.x += -d.z*sd*w; SV.z += d.x*sd*w;           // vira para a esquerda ou direita, o lado mais livre
+  }
+  const l = Math.hypot(SV.x, SV.z) || 1; return V(SV.x/l, 0, SV.z/l);
 }
 function startSeg(Z){ const s = Z.segs[Z.si];
   if(s.ladder && Z.lad && !Z.ladM){ const m = prop2('ladder', house); m.scale.set(2.2, WALLH*2.1, 2.2); m.position.set(Z.lad.x, 0, Z.lad.z); m.rotation.set(0, Z.lad.ry, 0); m.rotateX(-.18); Z.ladM = m; clank(Z.pos); } if(!Z.segStart) Z.segStart = Z.pos.clone(); Z.A.play(s.anim, {ts:s.ts, once:!!s.once, restart:!!s.once}); }
@@ -2688,7 +2725,7 @@ $('bPlace').addEventListener('click', () => {
 });
 $('go3D').addEventListener('click', () => { FS.enter(); begin(false); });
 
-window.ZG = {get owner(){ return OWNER; }, mk:(key, h, anim, x, ry = 0, gear)=>{ const A = actor(key, h, false, false, gear); A.g.position.set(x, 0, 3.6); A.g.rotation.y = ry; world.add(A.g); A.play(anim); setInterval(() => A.mixer.update(.016), 16); return 1; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
+window.ZG = {get owner(){ return OWNER; }, OBST, mk:(key, h, anim, x, ry = 0, gear)=>{ const A = actor(key, h, false, false, gear); A.g.position.set(x, 0, 3.6); A.g.rotation.y = ry; world.add(A.g); A.play(anim); setInterval(() => A.mixer.update(.016), 16); return 1; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();
     AC = oldAC; OUT = oldOUT; REV = oldREV; MUS = oldMUS; muted = oldM;
     const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, b = new DataView(new ArrayBuffer(44 + n*4)); const w = (o, t) => { for(let i=0;i<t.length;i++) b.setUint8(o + i, t.charCodeAt(i)); };
