@@ -300,8 +300,8 @@ let TYPES = {
 };
 
 /* ===== FASE 2: O Castelo da Pizza (invasores medievais, flechas, flechas de fogo e bombas) ===== */
-const FASE = clamp(parseInt(new URLSearchParams(location.search).get('fase')) || 1, 1, 4);
-const CASTLE = FASE === 2 || FASE === 4;   // muralha com portões e escadas (castelo e forte)
+const FASE = clamp(parseInt(new URLSearchParams(location.search).get('fase')) || 1, 1, 5);
+const CASTLE = FASE === 2 || FASE >= 4;   // muralha com portões e escadas (castelo e forte)
 if(FASE === 2){
   WEAPONS = [
     {name:'Flecha', kind:'arrow', kills:0, R:.55, dmg:1, n:1, cd:.26, color:0x8a5a2b, snd:'bomba1'},
@@ -359,8 +359,28 @@ if(FASE === 4){
     gigante:{label:'Grandes chefes', models:['Barbarian'], gear:['2H_Axe'], hp:5, pts:100, strong:true, speed:.45, h:1.8, walk:'Walking_A', ts:.7, attack:'2H_Melee_Attack_Chop', from:3800, w:1, breakT:1.5}
   };
 }
+/* ===== FASE 5: O Castelo do Samurai (ninjas, samurais e oni). Daqui em diante: 3 acertos de um atirador = 1 vida ===== */
+if(FASE === 5){
+  WEAPONS = [
+    {name:'Arco Yumi', kind:'arrow', kills:0, R:.6, dmg:1, n:1, cd:.26, color:0x8a5a2b},
+    {name:'Bomba de Fumaça', kind:'bomb', smoke:true, kills:10, R:1.3, dmg:1, n:1, cd:.42, color:0x4b4f5c, size:.17, snd:'bomba2'},
+    {name:'Canhão do Castelo', kind:'cannon', kills:25, R:1.5, dmg:2, n:1, cd:.55, color:0x2a2a2e, size:.15},
+    {name:'Chuva de Flechas', kind:'arrow', kills:45, R:.6, dmg:1, n:6, spread:1.6, cd:.5, color:0x8a5a2b},
+    {name:'Grande Bomba de Fumaça', kind:'bomb', smoke:true, kills:70, R:2.2, dmg:3, n:1, cd:.6, color:0x3a2f4f, size:.26, snd:'dinamite'}
+  ];
+  TYPES = {
+    zumbi:{label:'Ronin', models:['Knight'], gear:['1H_Sword'], look5:'ronin', hp:1, pts:50, speed:.62, h:1.05, walk:'Running_A', ts:.6, attack:'1H_Melee_Attack_Chop', from:0, w:5},
+    escalador:{label:'Ninjas escaladores', models:['Rogue_Hooded'], gear:['Knife'], look5:'ninja', hp:1, pts:50, speed:.85, h:.95, walk:'Running_A', ts:.85, attack:'1H_Melee_Attack_Chop', climb:true, from:300, w:2.4},
+    esqueleto:{label:'Ninjas de shuriken', models:['Rogue_Hooded'], gear:[], look5:'ninja', shuriken:true, archer:true, hp:1, pts:50, speed:.85, h:.95, walk:'Running_A', ts:.85, from:0, w:2.4},
+    guerreiro:{label:'Samurais', models:['Knight'], gear:['2H_Sword'], look5:'samurai', hp:2, pts:100, strong:true, speed:.62, h:1.12, walk:'Running_A', ts:.6, attack:'2H_Melee_Attack_Chop', from:1500, w:2.2},
+    ninja:{label:'Arqueiros de chapéu de palha', models:['Rogue'], gear:[], look5:'archer', bow:true, archer:true, hp:2, pts:100, strong:true, speed:.75, h:1.05, walk:'Running_A', ts:.7, from:900, w:1.8},
+    mago:{label:'Monges (se teletransportam)', models:['Mage'], gear:['2H_Staff'], look5:'monk', hp:3, pts:100, strong:true, speed:.6, h:1.05, walk:'Walking_A', blink:true, attack:'2H_Melee_Attack_Chop', from:3000, w:1.5},
+    gigante:{label:'Oni gigante', models:['Barbarian'], gear:['2H_Axe'], look5:'oni', hp:5, pts:100, strong:true, speed:.45, h:1.85, walk:'Walking_A', ts:.7, attack:'2H_Melee_Attack_Chop', from:3800, w:1, breakT:1.5}
+  };
+}
 Object.entries(TYPES).forEach(([k, T]) => T.key = k);
-const W = FASE === 4 ? {um:'guerreiro', uns:'guerreiros', Os:'Os guerreiros', casa:'o forte', Casa:'Forte', entrou:'Um guerreiro entrou no forte!', subiu:'Um guerreiro pulou a paliçada!', horda:'Ataque ao forte!', arma:'tiro', flechas:'As flechas acertaram o forte!', Inv:'Guerreiros'}
+const W = FASE === 5 ? {um:'invasor', uns:'invasores', Os:'Os invasores', casa:'o castelo', Casa:'Castelo', entrou:'Um invasor entrou no castelo!', subiu:'Um ninja escalou a muralha!', horda:'Ataque ao castelo!', arma:'flecha', flechas:'3 acertos no castelo!', Inv:'Invasores'}
+        : FASE === 4 ? {um:'guerreiro', uns:'guerreiros', Os:'Os guerreiros', casa:'o forte', Casa:'Forte', entrou:'Um guerreiro entrou no forte!', subiu:'Um guerreiro pulou a paliçada!', horda:'Ataque ao forte!', arma:'tiro', flechas:'As flechas acertaram o forte!', Inv:'Guerreiros'}
         : FASE === 3 ? {um:'viking', uns:'vikings', Os:'Os vikings', casa:'o navio', Casa:'Navio', entrou:'Um viking invadiu o navio!', subiu:'Um viking subiu no navio!', horda:'Ataque viking!', arma:'flecha', flechas:'As flechas vikings acertaram o navio!', Inv:'Vikings'}
         : FASE === 2 ? {um:'invasor', uns:'invasores', Os:'Os invasores', casa:'o castelo', Casa:'Castelo', entrou:'Um invasor entrou no castelo!', subiu:'Um invasor subiu a muralha!', horda:'Ataque em massa!', arma:'flecha', Inv:'Invasores'}
                      : {um:'zumbi', uns:'zumbis', Os:'Os zumbis', casa:'a casa', Casa:'Casa', entrou:'Um zumbi entrou na casa!', subiu:'Entrou pela chaminé!', horda:'Horda de zumbis!', arma:'bomba', Inv:'Zumbis'};
@@ -380,6 +400,16 @@ if(FASE === 2){
   li[1].textContent = 'Mire com o centro da tela e toque para atirar flechas. Depois vêm flechas de fogo e bombas.';
   li[2].textContent = 'Invasor comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.';
   li[3].textContent = 'Cada invasor que passa pelo portão ou sobe a muralha tira 1 das 5 vidas.';
+}
+if(FASE === 5){
+  document.title = 'Castelo do Samurai AR';
+  $('pzEyebrow').textContent = 'Monte a Pizza · Fase 5'; document.querySelector('#start h1').textContent = 'O Castelo do Samurai';
+  document.querySelector('#start .lede').textContent = 'A pizza chegou ao castelo do senhor samurai, e ninjas, ronins e um oni vêm tomá-la. Os arqueiros do castelo defendem as muralhas!';
+  const li = document.querySelectorAll('#start .steps li span');
+  li[0].textContent = 'Aponte a câmera para a mesa (ou para a caixa da pizza) e toque para colocar o castelo.';
+  li[1].textContent = 'Mire com o centro da tela e toque: arco, depois bombas de fumaça e o canhão do castelo.';
+  li[2].textContent = 'Invasor comum vale 50 pontos, os mais fortes valem 100. Chegue a 5.000.';
+  li[3].textContent = 'Novo: cada atirador (ninja de shuriken ou arqueiro) que acertar o castelo 3 vezes tira 1 vida. Veja as bolinhas em cima dele. Quem passa pelo portão ou escala a muralha também tira 1 vida.';
 }
 if(FASE === 4){
   document.title = 'Forte da Pizza AR';
@@ -542,7 +572,7 @@ const VOICES = {
 };
 let lastGroan = 0;
 function groan(p, kind = 'groan', T){
-  if(FASE >= 2){ if(kind === 'groan' && ok() && Math.random() < .5){ if(FASE === 4) drum(p); else clank(p); } return; }
+  if(FASE >= 2){ if(kind === 'groan' && ok() && Math.random() < .5){ if(FASE >= 4) drum(p); else clank(p); } return; }
   if(!ok()) return;
   const v = VOICES[T && T.key] || VOICES.zumbi;
   if(SAMPLES.z_gemido1){
@@ -820,12 +850,12 @@ function template(key, zombie, bare, gear, look){
   const b = new THREE.Box3();
   s.traverse(o => { if(o.isMesh){
     // inimigos ficam sem chapéu, capuz ou capacete: aparece a cabeça de zumbi / caveira
-    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare || FASE >= 3) && /Hat|Helmet|Hood(?!ed)/.test(o.name)) || (FASE === 4 && /Cape/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
+    if(!(KEEP.test(o.name) || (gear && gear.includes(o.name))) || ((zombie || bare || FASE >= 3) && /Hat|Helmet|Hood(?!ed)/.test(o.name) && !(FASE === 5 && key === 'Rogue_Hooded')) || (FASE >= 4 && /Cape/.test(o.name)) || (L && /Cape|Cloak/.test(o.name))) o.visible = false;
     o.frustumCulled = false;
     if(o.visible){ o.geometry.computeBoundingBox(); b.union(o.geometry.boundingBox); }
   } });
   const gh = Math.max(.5, b.max.y - b.min.y);
-  s.traverse(o => { if(o.isMesh) o.material = FASE >= 3 && key === 'Knight' && !gear ? navyOf(o.material) : FASE === 4 && gear ? buckskinOf(o.material, /Barbarian_Head/.test(o.name)) : L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
+  s.traverse(o => { if(o.isMesh) o.material = FASE === 5 && /_Head/.test(o.name) && (!gear || gear.includes('_def')) ? toonOf(o.material, false) : FASE === 5 ? japanOf(o.material, jpLook(key, gear), /Barbarian_Head|Knight_Head|Mage_Head/.test(o.name) && !!gear && !gear.includes('_def')) : FASE >= 3 && key === 'Knight' && !gear ? navyOf(o.material) : FASE === 4 && gear ? buckskinOf(o.material, /Barbarian_Head/.test(o.name)) : L ? toyMat(o.material, L, /Arm/.test(o.name) ? 'arm' : /Leg/.test(o.name) ? 'leg' : /Barbarian_Head/.test(o.name) ? 'beard' : /Head/.test(o.name) ? 'head' : 'body', 9/gh) : toonOf(o.material, zombie); });
   const tpl = {scene:s, h:gh};
   if(zombie || FASE >= 3){
     s.updateMatrixWorld(true);
@@ -1071,6 +1101,7 @@ function actor(key, h, zombie, bare, gear, look){
   else if(FASE === 3) englishHat(m, T, key);
   else if(FASE === 4 && gear) nativeHead(m, T, key, gear);
   else if(FASE === 4) westHat(m, T, key);
+  else if(FASE === 5) japanHead(m, T, key, gear);
   else if(zombie && bare) zombieFace(m, T.face);
   m.scale.setScalar(h/T.h);
   const g = new THREE.Group(); g.add(m);
@@ -1217,6 +1248,7 @@ function at(m, x, y, z, parent){ m.position.set(x, y, z); (parent || world).add(
 function buildGround(){
   if(FASE === 3) return buildSea();
   if(FASE === 4) return buildDesert();
+  if(FASE === 5) return buildJapanGround();
   const grass = canvasTex(1024, 1024, (g, w, h) => {
     g.fillStyle = '#7cc35b'; g.fillRect(0, 0, w, h); const r = rng(5);
     for(let i=0;i<900;i++){ g.fillStyle = r() < .5 ? 'rgba(60,130,50,.35)' : 'rgba(170,220,110,.35)'; const x = r()*w, y = r()*h; g.beginPath(); g.ellipse(x, y, 3 + r()*9, 2 + r()*5, r()*3, 0, 6.3); g.fill(); }
@@ -1497,13 +1529,17 @@ function addBow(A, h){
 }
 // flecha dos arqueiros vikings em direção ao convés
 function enemyArrow(Z){
-  const from = Z.pos.clone().add(V(0, Z.T.h*.75, 0)), to = FASE === 4 ? V(rand(-2.2, 2.2)*HS, .02, rand(-2.2, 2.2)*HS) : V(rand(-1.6, 1.4)*HS, (DECK + .05)*HS, rand(-.6, .6)*HS);
-  const m = makeArrow({kind:'arrow'}); m.scale.setScalar(.45); world.add(m); const prev = V(); let landed = false;
-  twang(false);
+  const from = Z.pos.clone().add(V(0, Z.T.h*.75, 0)), to = FASE >= 4 ? V(rand(-2.2, 2.2)*HS, .02, rand(-2.2, 2.2)*HS) : V(rand(-1.6, 1.4)*HS, (DECK + .05)*HS, rand(-.6, .6)*HS);
+  const star = Z.T.shuriken, m = star ? makeShuriken() : makeArrow({kind:'arrow'}); if(!star) m.scale.setScalar(.45); world.add(m); const prev = V(); let landed = false;
+  if(star) whoosh(); else twang(false);
   fx(m, 1.6, (f, k) => { const q = Math.min(1, f.t/.7); prev.copy(m.position);
     m.position.lerpVectors(from, to, q); m.position.y += Math.sin(q*Math.PI)*.9;
-    if(q < 1 && prev.distanceToSquared(m.position) > 1e-8){ const ah = m.position.clone().add(m.position.clone().sub(prev)); m.lookAt(world.localToWorld(ah)); }
-    if(q >= 1 && !landed){ landed = true; thunk(to, false); puffs(to.clone(), 0xb08050, 3, .07, .4); houseShake = Math.max(houseShake, .12); } });
+    if(star){ if(q < 1) m.rotation.y += .5; }
+    else if(q < 1 && prev.distanceToSquared(m.position) > 1e-8){ const ah = m.position.clone().add(m.position.clone().sub(prev)); m.lookAt(world.localToWorld(ah)); }
+    if(q >= 1 && !landed){ landed = true; if(star) clank(to); else thunk(to, false); puffs(to.clone(), 0xb08050, 3, .07, .4); houseShake = Math.max(houseShake, .12);
+      // fase 5 em diante: a cada 3 acertos do mesmo atirador, o jogador perde 1 vida
+      if(FASE >= 5 && mode === 'play' && !['dead', 'gone'].includes(Z.state)){ Z.hits = (Z.hits || 0) + 1; drawMark(Z);
+        if(Z.hits >= 3){ loseLife(Z, W.flechas); Z.hits = 0; setTimeout(() => drawMark(Z), 600); } } } });
 }
 function boatSync(Z){
   const b = Z.boat; if(!b) return; const t = G ? G.t : 0, bob = BOATY + Math.sin(t*2.2 + Z.bph)*.03;
@@ -1733,6 +1769,187 @@ function westHat(m, T, key){
   }
   T.westH.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
 }
+/* ===== Fase 5: Japão feudal — castelo com torre de vários andares, muralha de pedra, cerejeiras ===== */
+function jpLook(key, gear){
+  if(!gear) return key === 'Knight' ? 'lord' : key === 'Mage' ? 'lady' : 'boy';
+  if(gear.includes('_def')) return 'defender';
+  if(key === 'Rogue_Hooded') return 'ninja'; if(key === 'Rogue') return 'archer'; if(key === 'Mage') return 'monk'; if(key === 'Barbarian') return 'oni';
+  return gear.includes('2H_Sword') ? 'samurai' : 'ronin';
+}
+// cores de cada personagem (armadura laqueada, roupa de ninja etc.), mantendo pele e sombras do modelo
+function japanOf(m, look, head){
+  const k = m.uuid + 'jp' + look + (head ? 'h' : ''); if(toonCache.has(k)) return toonCache.get(k);
+  const P = {ninja:['vec3(.03,.035,.07)', 'vec3(.03,.035,.07)'], ronin:['vec3(.12,.1,.09)', 'vec3(.07,.08,.16)'], samurai:['vec3(.04,.035,.035)', 'vec3(.05,.04,.04)'],
+    archer:['vec3(.32,.22,.12)', 'vec3(.38,.27,.15)'], monk:['vec3(.6,.25,.04)', 'vec3(.62,.27,.05)'], oni:['vec3(.5,.36,.08)', 'vec3(.45,.3,.06)'],
+    defender:['vec3(.42,.04,.03)', 'vec3(.1,.08,.12)'], lord:['vec3(.48,.05,.04)', 'vec3(.12,.08,.14)'], lady:['vec3(.55,.12,.25)', 'vec3(.6,.15,.3)'], boy:['vec3(.12,.2,.38)', 'vec3(.12,.2,.38)']}[look];
+  const t = new THREE.MeshToonMaterial({color:m.color, map:m.map, gradientMap:GRAD, side:m.side});
+  t.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+    vec3 c = diffuseColor.rgb; float l = sqrt(dot(c, vec3(.3,.59,.11)));
+    float skin = step(.45, c.r) * step(c.b, .5*c.r) * step(.5*c.r, c.g) * step(c.g, .97*c.r);
+    float metal = step(max(c.r, max(c.g, c.b)) - min(c.r, min(c.g, c.b)), .06) * step(.25, l);
+    vec3 armor = ${P[0]}*(.6 + 1.5*l), cloth = ${P[1]}*(.55 + 1.4*l), gold = vec3(.75,.55,.15);
+    vec3 outc = mix(cloth, mix(armor, gold, step(.82, l)*.8), metal);
+    ${look === 'oni' ? 'vec3 sk = vec3(.62,.07,.05)*(.75 + .5*l); outc = l < .32 ? vec3(.1,.05,.03) : (metal > .5 ? vec3(.25,.25,.28)*(.6 + l) : mix(sk, vec3(.55,.4,.08)*(.6 + l), step(.6, fract(c.r*9.))));' : 'vec3 sk = c;'}
+    ${head && look !== 'oni' ? 'outc = vec3(.86,.52,.28)*(.85 + .3*l);' : ''}
+    diffuseColor.rgb = mix(outc, sk, skin);`); };
+  t.customProgramCacheKey = () => 'jp' + look + (head ? 'h' : ''); toonCache.set(k, t); return t;
+}
+function japanHead(m, T, key, gear){
+  const bone = m.getObjectByName('head'), face = T.face; if(!bone || !face) return;
+  const look = jpLook(key, gear);
+  const F = new THREE.Group(); F.position.copy(face.frame.pos); F.quaternion.copy(face.frame.quat); F.scale.setScalar(face.frame.s); bone.add(F);
+  if(!T.jpH){
+    const S = face.size, hx = S.x/2, hy = S.y/2, hz = S.z/2, u = S.x, G = new THREE.Group();
+    const add = (geo, mt, p, sc, r) => { const o = new THREE.Mesh(geo, mt); o.position.set(p[0], p[1], p[2]); if(sc.length) o.scale.set(sc[0], sc[1], sc[2]); else o.scale.setScalar(sc); if(r) o.rotation.set(r[0], r[1], r[2]); G.add(o); return o; };
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 24), hair = mat(0x141218), gold = mat(0xd4a83a);
+    const kabuto = (shell, crest) => {   // capacete samurai: casco, protetor de nuca em leque e crista dourada em "V"
+      add(capGeo, shell, [0, hy*.05, -hz*.04], [hx*1.12, hy*.95, hz*1.14]);
+      add(new THREE.CylinderGeometry(1, 1.35, 1, 24, 1, true, Math.PI*.35, Math.PI*1.3), mat(0x2b2b33, {side:THREE.DoubleSide}), [0, hy*.05, -hz*.06], [hx*1.15, hy*.42, hz*1.15]);
+      add(cubeGeo, shell, [0, hy*.32, hz*1.05], [u*.95, hy*.1, u*.1], [.25, 0, 0]);   // aba da frente
+      [-1, 1].forEach(sx => { const h = add(cubeGeo, crest, [sx*hx*.42, hy*1.0, hz*.95], [u*.06, hy*.95, u*.03]); h.rotation.set(-.15, 0, -sx*.45); });
+      add(new THREE.CylinderGeometry(1, 1, 1, 12).rotateX(Math.PI/2), crest, [0, hy*.45, hz*1.12], [u*.1, u*.1, u*.02]);
+    };
+    if(look === 'ninja'){   // máscara de pano escuro cobrindo nariz e boca
+      const cloth = mat(0x15161f);
+      add(capGeo, cloth, [0, hy*.02, -hz*.04], [hx*1.08, hy*1.05, hz*1.1]);
+      add(new THREE.CylinderGeometry(1, 1, 1, 24, 1, true, -Math.PI*.55, Math.PI*1.1), mat(0x15161f, {side:THREE.DoubleSide}), [0, -hy*.42, 0], [hx*1.04, hy*.55, hz*1.08]);
+      add(cubeGeo, mat(0x6b1f2a), [0, hy*.38, hz*.95], [u*.98, hy*.1, u*.04]);
+      [-1, 1].forEach(sx => add(cubeGeo, mat(0x6b1f2a), [sx*hx*.2, hy*.3, -hz*1.1], [u*.08, hy*.5, u*.02], [0, 0, sx*.3]));
+    } else if(look === 'ronin'){   // coque samurai (chonmage) e faixa na testa
+      add(capGeo, hair, [0, -hy*.02, -hz*.05], [hx*1.06, hy*1.0, hz*1.08]);
+      add(new THREE.CapsuleGeometry(.5, 1, 4, 8), hair, [0, hy*1.0, -hz*.1], [u*.14, u*.24, u*.14], [Math.PI/2.3, 0, 0]);
+      add(bandGeo, mat(0xe9e2cf), [0, hy*.35, -hz*.04], [hx*1.09, hy*.12, hz*1.11]);
+      add(cubeGeo, hair, [0, -hy*.35, -hz*.95], [hx*1.4, hy*.7, u*.1]);
+    } else if(look === 'samurai' || look === 'lord'){ kabuto(mat(look === 'lord' ? 0x9b1d14 : 0x1b1a20), gold);
+    } else if(look === 'archer' || look === 'defender'){   // chapéu cônico (kasa de palha ou jingasa laqueado)
+      const hatM = mat(look === 'archer' ? 0xd7b770 : 0x1d1b22), y0 = hy*.62;
+      add(new THREE.ConeGeometry(1, 1, 28), hatM, [0, y0 + hy*.18, -hz*.03], [hx*1.9, hy*.42, hz*1.9]);
+      add(cyl, hatM, [0, y0 - hy*.02, -hz*.03], [hx*1.88, hy*.02, hz*1.88]);
+      if(look === 'defender') add(new THREE.CylinderGeometry(1, 1, 1, 16).rotateX(-.3), gold, [0, y0 + hy*.27, hz*.85], [u*.13, u*.01, u*.13]);
+      else add(cubeGeo, mat(0x8c6a33), [0, -hy*.5, hz*.7], [u*.02, hy*.9, u*.02]);
+    } else if(look === 'monk'){   // cabeça raspada, contas de oração e chapéu de palha de monge
+      add(capGeo, mat(0xe0b089), [0, -hy*.02, -hz*.04], [hx*1.05, hy*1.02, hz*1.07]);
+      for(let i=0;i<12;i++){ const a = -1.2 + i*2.4/11; add(ballGeo, mat(0x5a3418), [Math.sin(a)*hx*.95, -hy*1.1 + Math.cos(a)*hy*.2, Math.cos(a)*hz*.75], u*.05); }
+    } else if(look === 'oni'){   // demônio oni: chifres e cabeleira desgrenhada
+      [-1, 1].forEach(sx => { const h = add(new THREE.ConeGeometry(1, 1, 10).translate(0, .5, 0), mat(0xefe6c8), [sx*hx*.45, hy*.7, hz*.15], [u*.11, u*.42, u*.11]); h.rotation.z = -sx*.3; });
+      for(let i=0;i<18;i++){ const a = rand(0, Math.PI*2), t = rand(0, 1.1), d = V(Math.sin(t)*Math.cos(a), Math.cos(t), Math.sin(t)*Math.sin(a));
+        if(d.z > .5 && t > .6) continue; const o = add(spikeGeo, mat(0xd8d2c4), [d.x*hx*.9, d.y*hy*.9, d.z*hz*.9], [u*.1, u*.35, u*.1]); o.quaternion.setFromUnitVectors(V(0, 1, 0), d.add(V(0, .3, -.2)).normalize()); }
+    } else if(look === 'lady'){   // cabelo preso em coque com grampos (kanzashi)
+      add(capGeo, hair, [0, -hy*.02, -hz*.05], [hx*1.08, hy*1.05, hz*1.1]);
+      add(ballGeo, hair, [0, hy*.95, -hz*.25], [u*.32, u*.24, u*.28]);
+      [-1, 1].forEach(sx => { add(cubeGeo, gold, [sx*hx*.3, hy*1.0, -hz*.2], [u*.5, u*.02, u*.02], [0, 0, sx*.3]); add(ballGeo, mat(0xe35a7a), [sx*hx*.55, hy*1.1, -hz*.2], u*.06); });
+    } else {   // menino: faixa branca (hachimaki) com círculo vermelho
+      add(bandGeo, mat(0xf4f1ea), [0, hy*.32, -hz*.04], [hx*1.1, hy*.15, hz*1.12]);
+      add(new THREE.CylinderGeometry(1, 1, 1, 16).rotateX(Math.PI/2), mat(0xc8202a), [0, hy*.32, hz*1.13], [u*.09, u*.09, u*.01]);
+    }
+    T.jpH = bake(G);
+  }
+  T.jpH.forEach(me => { const o = new THREE.Mesh(me.geometry, me.material); o.frustumCulled = false; F.add(o); });
+}
+function buildJapanGround(){
+  const grass = canvasTex(1024, 1024, (g, w, h) => {
+    g.fillStyle = '#8cc263'; g.fillRect(0, 0, w, h); const r = rng(21);
+    for(let i=0;i<900;i++){ g.fillStyle = r() < .5 ? 'rgba(60,120,50,.3)' : 'rgba(190,225,130,.3)'; const x = r()*w, y = r()*h; g.beginPath(); g.ellipse(x, y, 3 + r()*9, 2 + r()*5, r()*3, 0, 6.3); g.fill(); }
+    for(let i=0;i<260;i++){ g.fillStyle = 'rgba(255,190,215,.8)'; g.beginPath(); g.ellipse(r()*w, r()*h, 3, 2, r()*3, 0, 6.3); g.fill(); }   // pétalas de cerejeira
+    g.fillStyle = '#d9d4c7'; g.fillRect(512 - 205, 512 - 205, 410, 410);   // cascalho do pátio
+    g.strokeStyle = 'rgba(150,140,120,.6)'; g.lineWidth = 2; for(let y=512-200;y<512+200;y+=14){ g.beginPath(); g.moveTo(512 - 200, y); g.bezierCurveTo(512 - 70, y - 6, 512 + 70, y + 6, 512 + 200, y); g.stroke(); }
+    g.fillStyle = 'rgba(150,120,80,.45)'; g.beginPath(); g.ellipse(512, 512 - 385, 300, 90, 0, 0, 6.3); g.fill();   // acampamento inimigo
+  });
+  const top = new THREE.Mesh(new THREE.CircleGeometry(9.5, 72).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:grass, gradientMap:GRAD}));
+  top.material.userData.outlineParameters = {visible:false}; world.add(top); RAYS.push(top); top.userData.ground = true;
+  const side = new THREE.Mesh(new THREE.CylinderGeometry(9.5, 9.1, .6, 72, 1, true), mat(0x7a5a3a, {side:THREE.DoubleSide})); side.position.y = -.3; world.add(side);
+  const bottom = new THREE.Mesh(new THREE.CircleGeometry(9.1, 72).rotateX(Math.PI/2), mat(0x5c4128)); bottom.position.y = -.6; world.add(bottom);
+  const road = canvasTex(1024, 128, (g, w, h) => { g.fillStyle = '#c9c1ae'; g.fillRect(0, 0, w, h); for(let x=0;x<w;x+=46){ g.fillStyle = 'rgba(120,110,95,.5)'; g.fillRect(x, 6, 40, h - 12); g.fillStyle = '#d8d1c0'; g.fillRect(x + 3, 9, 34, h - 18); } });
+  const rd = new THREE.Mesh(new THREE.PlaneGeometry(14.6, 1.3).rotateX(-Math.PI/2), new THREE.MeshToonMaterial({map:road, gradientMap:GRAD, polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-4}));
+  rd.material.userData.outlineParameters = {visible:false}; rd.position.set(0, .04, 6.1); world.add(rd);
+}
+// telhado japonês: pirâmide baixa de 4 lados com beirais largos e cumeeira
+function jpRoof(w, d, h, color){ const g = new THREE.Group();
+  const r = new THREE.Mesh(new THREE.CylinderGeometry(.08, .72, h, 4, 1).rotateY(Math.PI/4), mat(color)); r.scale.set(w, 1, d); g.add(r);
+  const eave = box(w*1.03, .05, d*1.03, 0x2b2b33, .02); eave.position.y = -h/2; g.add(eave);
+  [-1, 1].forEach(sx => [-1, 1].forEach(sz => { const tip = new THREE.Mesh(new THREE.ConeGeometry(.05, .18, 6), mat(color)); tip.position.set(sx*w*.5, -h/2 + .06, sz*d*.5); tip.rotation.set(sz*.6, 0, -sx*.6); g.add(tip); }));
+  return g; }
+function buildJapanCastle(){
+  house = new THREE.Group(); world.add(house); FZ = LC + .45; chimneyTop = null; door = new THREE.Object3D();
+  const H = house, gates = [];
+  const stone = canvasTex(256, 128, (g, w, h) => { g.fillStyle = '#9b958a'; g.fillRect(0, 0, w, h); for(let y=0;y<h;y+=22) for(let x=(y/22)%2*20;x<w;x+=40){ g.fillStyle = ['#8a8479', '#a8a296', '#94897c'][(x + y) % 3]; g.fillRect(x + 2, y + 2, 36, 18); } }, [6, 1]);
+  const stoneM = new THREE.MeshToonMaterial({map:stone, gradientMap:GRAD});
+  const wallSeg = (x, z, len, rotY) => { const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = rotY; H.add(g);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(len, .6, .7), stoneM); base.position.y = .3; g.add(base);
+    const wl = box(len, .5, .26, 0xf2efe6, .02); wl.position.y = .85; g.add(wl);
+    const band = box(len, .08, .28, 0x2b2b33, .01); band.position.y = .62; g.add(band);
+    for(let t = -len/2 + .4; t < len/2 - .2; t += .7){ const hole = box(.12, .1, .3, 0x1d1b22, .01); hole.position.set(t, .9, 0); g.add(hole); }   // seteiras
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(.05, .3, .2, 4, 1).rotateY(Math.PI/4), mat(0x3a3d48)); cap.scale.set(len*1.4, 1, 1); cap.position.y = 1.2; g.add(cap); };
+  [[0, 1], [0, -1]].forEach(([ax, az]) => { [-1, 1].forEach(s => wallSeg(s*(LC + .62)/2, az*LC, LC - .62, 0)); });
+  [[1, 0], [-1, 0]].forEach(([ax]) => wallSeg(ax*LC, 0, 2*LC, Math.PI/2));
+  [1, -1].forEach(az => {   // portões com casa de guarda
+    const g = new THREE.Group(); g.position.set(0, 0, az*LC); g.rotation.y = az > 0 ? 0 : Math.PI; H.add(g);
+    [-1, 1].forEach(sx => { const d = box(.6, 1.0, .12, 0x3a2418, .03); d.position.set(sx*.31, .5, 0); g.add(d);
+      for(let i=0;i<3;i++) for(let j=0;j<2;j++){ const st = new THREE.Mesh(new THREE.SphereGeometry(.025, 6, 4), mat(0x8e949b)); st.position.set(sx*.31 + (j - .5)*.3, .2 + i*.3, .07); g.add(st); } });
+    [-1, 1].forEach(sx => { const post = box(.16, 1.5, .16, 0x2b1d14, .02); post.position.set(sx*.7, .75, 0); g.add(post); });
+    const gh = box(1.7, .4, .6, 0xf2efe6, .03); gh.position.y = 1.35; g.add(gh);
+    const rf = jpRoof(2.1, .95, .45, 0x3a3d48); rf.position.y = 1.78; g.add(rf);
+    gates.push(g);
+  });
+  // torres dos cantos (yagura) de dois andares
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([x, z]) => { const t = new THREE.Group(); t.position.set(x*LC, 0, z*LC); H.add(t);
+    const b = new THREE.Mesh(new THREE.BoxGeometry(1.1, .7, 1.1), stoneM); b.position.y = .35; t.add(b);
+    const w1 = box(.95, .6, .95, 0xf2efe6, .03); w1.position.y = 1.0; t.add(w1); const r1 = jpRoof(1.3, 1.3, .3, 0x3a3d48); r1.position.y = 1.42; t.add(r1);
+    const w2 = box(.65, .4, .65, 0xf2efe6, .03); w2.position.y = 1.72; t.add(w2); const r2 = jpRoof(.95, .95, .38, 0x3a3d48); r2.position.y = 2.1; t.add(r2);
+    if(z > 0){ const c = new THREE.Mesh(new THREE.CylinderGeometry(.06, .08, .45, 10).rotateX(Math.PI/2), mat(0x2a2a2e)); c.position.set(x*.15, 1.05, .5); t.add(c); } });
+  // torre principal (tenshu): base de pedra e três andares com telhados curvos e peixes dourados no topo
+  const k = new THREE.Group(); k.position.set(0, 0, -.6); H.add(k);
+  const kb = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.45, .8, 4, 1).rotateY(Math.PI/4), stoneM); kb.position.y = .4; k.add(kb);
+  let y = .8; [[1.7, .7], [1.35, .6], [1.0, .55]].forEach(([w, h], i) => {
+    const wl = box(w, h, w*.85, 0xf2efe6, .03); wl.position.y = y + h/2; k.add(wl);
+    for(let j=-1;j<=1;j++){ const win = box(.14, .16, .02, 0x2b1d14, .01); win.position.set(j*w*.28, y + h*.55, w*.425 + .01); k.add(win); }
+    const rf = jpRoof(w*1.35, w*1.2, .42, 0x3a3d48); rf.position.y = y + h + .16; k.add(rf); y += h + .3; });
+  [-1, 1].forEach(sx => { const sf = box(.08, .18, .05, 0xd4a83a, .02); sf.position.set(sx*.25, y + .02, 0); sf.rotation.z = sx*.4; k.add(sf); });
+  // soldados (arqueiros) nas muralhas
+  SOLDIERS.length = 0;
+  [[-1.4, 1], [1.4, 1], [1, 0], [-1, 0], [0, -1]].forEach(([t, side], i) => {
+    const A = actor('Knight', .9, false, false, ['_def']); const s = side === 1 ? V(t, 0, LC - .05) : side === -1 ? V(t, 0, -LC + .05) : V(t*(LC - .05), 0, .4*(i - 2.5));
+    A.g.position.set(s.x, WALLH - .05, s.z); A.g.rotation.y = Math.atan2(s.x, s.z); A.shadow.visible = false; H.add(A.g); A.play('2H_Ranged_Aiming'); addBow(A, .9); SOLDIERS.push(A);
+  });
+  ENTRIES = [{p:V(0, 0, LC + .55), obj:gates[0], door:true}, {p:V(0, 0, -LC - .55), obj:gates[1], door:true}];
+  ENTRIES.forEach(e => { e.ang = Math.atan2(e.p.z, e.p.x); e.rz = e.obj.rotation.z; e.ry = e.obj.rotation.y; e.gate = true; });
+  house.traverse(o => { if(o.isMesh && !o.isSkinnedMesh) RAYS.push(o); });
+}
+function buildProps5(){
+  GRAVES.push(V(-1.8, 0, -6.3), V(0, 0, -6.7), V(1.9, 0, -6.2));
+  const pink = [0xf7b6cf, 0xf29bbd, 0xfbd0e0];
+  const sakura = (x, z, s) => { obst(x, z, .4*s); const g = new THREE.Group(); g.position.set(x, 0, z); g.scale.setScalar(s); world.add(g);
+    const tr = new THREE.Mesh(new THREE.CylinderGeometry(.07, .12, 1.1, 7), mat(0x5a3a2a)); tr.position.y = .55; tr.rotation.z = .12; g.add(tr);
+    for(let i=0;i<7;i++){ const b = new THREE.Mesh(sphereGeo, mat(pink[i % 3])); b.scale.setScalar(rand(.32, .48)); b.position.set(rand(-.5, .5), 1.15 + rand(-.1, .35), rand(-.45, .45)); g.add(b); } };
+  [[-6.2, 2.8, 1.1], [6.3, 2.4, 1.0], [-5.2, 5.6, .9], [5.4, 5.3, 1.1], [-7.4, -1.4, 1.0], [7.2, -1.8, 1.05], [-3.8, 6.9, .8], [3.9, 7.0, .85]].forEach(([x, z, s]) => sakura(x, z, s));
+  const lantern = (x, z) => { obst(x, z, .22); const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g); const sm = mat(0xa8a296);
+    const b = box(.3, .08, .3, 0xa8a296, .02); b.position.y = .04; g.add(b); const c = new THREE.Mesh(new THREE.CylinderGeometry(.06, .08, .45, 8), sm); c.position.y = .3; g.add(c);
+    const f = box(.26, .2, .26, 0xa8a296, .02); f.position.y = .62; g.add(f); const lt = box(.14, .12, .28, 0xffd36b, .01, {emissive:0x806020}); lt.position.y = .62; g.add(lt);
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(.04, .26, .16, 4).rotateY(Math.PI/4), sm); r.position.y = .8; g.add(r); };
+  [[-1.3, 4.0], [1.3, 4.0], [-4.4, -2.0], [4.4, -2.2]].forEach(([x, z]) => lantern(x, z));
+  const bamboo = (x, z) => { obst(x, z, .45); for(let i=0;i<7;i++){ const h = rand(1.4, 2.2), b = new THREE.Mesh(new THREE.CylinderGeometry(.04, .045, h, 6), mat(i % 2 ? 0x6fa84a : 0x5c9a3c)); b.position.set(x + rand(-.3, .3), h/2, z + rand(-.3, .3)); b.rotation.z = rand(-.08, .08); world.add(b);
+    const lf = new THREE.Mesh(new THREE.ConeGeometry(.12, .4, 4), mat(0x7cbf4f)); lf.position.set(b.position.x, h, b.position.z); lf.rotation.z = 1.2; world.add(lf); } };
+  bamboo(-7.6, 3.6); bamboo(7.5, 4.0); bamboo(-5.0, -4.6);
+  // portal torii vermelho na entrada da estrada
+  const tg = new THREE.Group(); tg.position.set(-4.2, 0, 6.1); tg.rotation.y = Math.PI/2; world.add(tg); obst(-4.2, 5.25, .2); obst(-4.2, 6.95, .2);
+  const red = 0xc8302a; [-.85, .85].forEach(x => { const p = new THREE.Mesh(new THREE.CylinderGeometry(.08, .09, 1.9, 10), mat(red)); p.position.set(x, .95, 0); tg.add(p); });
+  const kas = box(2.4, .14, .2, 0x1d1b22, .03); kas.position.y = 2.0; tg.add(kas); const kas2 = box(2.2, .12, .16, red, .03); kas2.position.y = 1.86; tg.add(kas2); const nuki = box(1.9, .1, .12, red, .02); nuki.position.y = 1.5; tg.add(nuki);
+  // acampamento inimigo: tendas e bandeiras nobori
+  [[-2.0, -7.3, 0], [0, -7.8, .3], [2.1, -7.2, -.2]].forEach(([x, z, r]) => { obst(x, z, .85); const o = prop2('tent'); o.scale.setScalar(1.7); o.position.set(x, 0, z); o.rotation.y = r; });
+  const flagTex = canvasTex(64, 192, (g, w, h) => { g.fillStyle = '#f2efe6'; g.fillRect(0, 0, w, h); g.fillStyle = '#1d1b22'; g.beginPath(); g.arc(w/2, h*.3, 18, 0, 6.3); g.fill(); g.fillStyle = '#f2efe6'; g.beginPath(); g.arc(w/2, h*.3, 9, 0, 6.3); g.fill(); g.fillStyle = '#1d1b22'; g.fillRect(0, h*.62, w, 10); });
+  [[-3.4, -6.0], [-1.0, -6.4], [1.1, -6.5], [3.3, -6.1]].forEach(([x, z]) => { obst(x, z, .12); const pl = new THREE.Mesh(new THREE.CylinderGeometry(.025, .025, 2.0, 5), mat(0x2b1d14)); pl.position.set(x, 1.0, z); world.add(pl);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(.32, .9), new THREE.MeshToonMaterial({map:flagTex, gradientMap:GRAD, side:THREE.DoubleSide})); fl.position.set(x + .17, 1.45, z); world.add(fl); });
+  [[-4.6, 3.6], [4.7, 3.9]].forEach(([x, z]) => { obst(x, z, .55); const r = prop2('rock'); r.scale.setScalar(1.5); r.position.set(x, 0, z); r.rotation.y = rand(0, 6); });
+}
+// shuriken dos ninjas
+const shurikenGeo = (() => { const s = new THREE.Shape(); for(let i=0;i<8;i++){ const a = i*Math.PI/4, r = i % 2 ? .35 : 1; i ? s.lineTo(Math.cos(a)*r, Math.sin(a)*r) : s.moveTo(r, 0); } s.closePath(); return new THREE.ExtrudeGeometry(s, {depth:.15, bevelEnabled:false}).rotateX(Math.PI/2).translate(0, .07, 0); })();
+function makeShuriken(){ const m = new THREE.Mesh(shurikenGeo, mat(0xb9c1c9)); m.scale.setScalar(.09); return m; }
+// marcador de acertos (●●○) em cima dos atiradores, a partir da fase 5
+function hitMark(){ const c = document.createElement('canvas'); c.width = 96; c.height = 32; const t = new THREE.CanvasTexture(c); const s = new THREE.Sprite(new THREE.SpriteMaterial({map:t, depthWrite:false, transparent:true})); s.scale.set(.5, .17, 1); s.userData.c = c; return s; }
+function drawMark(Z){ if(!Z.mark) return; const c = Z.mark.userData.c, g = c.getContext('2d'); g.clearRect(0, 0, 96, 32);
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect ? g.roundRect(2, 2, 92, 28, 14) : g.rect(2, 2, 92, 28); g.fill();
+  for(let i=0;i<3;i++){ g.beginPath(); g.arc(22 + i*26, 16, 8, 0, 6.3); g.fillStyle = i < (Z.hits || 0) ? '#ff5a3c' : 'rgba(255,255,255,.35)'; g.fill(); }
+  Z.mark.material.map.needsUpdate = true; }
 function propAt(name, x, z, s, ry = 0, y = 0){
   const o = GL.props.scenes[PROPS.indexOf(name)].clone(true);
   o.traverse(c => { if(c.isMesh) c.material = toonOf(c.material, false); });
@@ -1959,7 +2176,7 @@ function setupScene(){
   scene.add(new THREE.HemisphereLight(0xfff4e0, 0x6a5a4a, 1.05));
   const sun = new THREE.DirectionalLight(0xffffff, 1.25); sun.position.set(-4, 9, 6); scene.add(sun);
   root = new THREE.Group(); world = new THREE.Group(); root.add(world);
-  buildGround(); if(FASE === 4){ buildFort(); buildProps4(); } else if(FASE === 3){ buildShip(); buildProps3(); } else if(FASE === 2){ buildCastle(); buildProps2(); } else { buildHouse(); buildProps(); }
+  buildGround(); if(FASE === 5){ buildJapanCastle(); buildProps5(); } else if(FASE === 4){ buildFort(); buildProps4(); } else if(FASE === 3){ buildShip(); buildProps3(); } else if(FASE === 2){ buildCastle(); buildProps2(); } else { buildHouse(); buildProps(); }
   marker = new THREE.Group(); markerRing = new THREE.Mesh(new THREE.RingGeometry(.86, 1, 40), fxMat(0xffffff, .9)); marker.add(markerRing);
   const dot = new THREE.Mesh(new THREE.CircleGeometry(.08, 16), fxMat(0xff5a3c, 1)); dot.position.z = .01; marker.add(dot);
   marker.visible = false; world.add(marker);
@@ -2092,7 +2309,7 @@ function gestureTip(){
 function fireTutorialDone(){
   if(tutStep !== 'fire') return;
   LS.set('ztut', '1'); tutOff();
-  tip('Isso! ' + W.um[0].toUpperCase() + W.um.slice(1) + ' comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum ' + (FASE === 3 ? 'subir no navio!' : FASE === 4 ? 'entrar no forte!' : 'entrar!'));
+  tip('Isso! ' + W.um[0].toUpperCase() + W.um.slice(1) + ' comum vale <b>50</b>, os fortes valem <b>100</b>. Não deixe nenhum ' + (FASE === 3 ? 'subir no navio!' : FASE === 4 ? 'entrar no forte!' : FASE === 5 ? 'entrar no castelo!' : 'entrar!'));
   setTimeout(() => { if(!tutStep){ $('tip').hidden = true; gestureTip(); } }, 3200);
 }
 function endIntro(){
@@ -2189,6 +2406,7 @@ function spawn(typeKey, fromGrave){
   if(Z.boat) boatSync(Z); else puffs(pos.clone().setY(.1), 0x8a6a48, 6, .22, .6);
   if(Math.random() < .35) groan(pos, 'groan', T);
   if(T.hp > 1){ Z.bar = hpBar(); A.g.add(Z.bar); Z.bar.position.y = T.h + .35; drawBar(Z); }
+  if(FASE >= 5 && T.archer){ Z.mark = hitMark(); A.g.add(Z.mark); Z.mark.position.y = T.h + (T.hp > 1 ? .58 : .38); drawMark(Z); }
   return Z;
 }
 function hpBar(){ const c = document.createElement('canvas'); c.width = 64; c.height = 12; const t = new THREE.CanvasTexture(c); const m = new THREE.SpriteMaterial({map:t, depthWrite:false, transparent:true}); const s = new THREE.Sprite(m); s.scale.set(.6, .11, 1); s.userData.c = c; return s; }
@@ -2206,13 +2424,13 @@ function updateZombie(Z, dt){
     if(k >= 1){ Z.state = 'move'; Z.t = 0; startSeg(Z); }
     return;
   }
-  if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play(T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); else if(Z.state === 'shoot') A.play('2H_Ranged_Aiming'); else if(Z.state === 'leave') A.play(Z.boat ? 'Idle' : T.walk, {ts:T.ts}); } return; }
+  if(Z.state === 'hit'){ Z.hitT -= dt; if(Z.hitT <= 0){ Z.state = Z.prev; if(Z.state === 'move') startSeg(Z); else if(Z.state === 'break') A.play(T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); else if(Z.state === 'shoot') A.play(T.shuriken ? 'Idle' : '2H_Ranged_Aiming'); else if(Z.state === 'leave') A.play(Z.boat ? 'Idle' : T.walk, {ts:T.ts}); } return; }
   if(Z.state === 'shoot'){   // arqueiro viking atirando no navio do barco
     turn(A.g, yawTo(Z.pos, V()), dt); Z.shootT += dt; Z.volley -= dt;
-    if(Z.volley <= 0){ Z.volley = rand(1.3, 1.9); A.play('2H_Ranged_Shoot', {once:true, restart:true, fade:.1}); Z.pend = .3; Z.back = .9; }
+    if(Z.volley <= 0){ Z.volley = rand(1.3, 1.9); A.play(T.shuriken ? 'Throw' : '2H_Ranged_Shoot', {once:true, restart:true, fade:.1}); Z.pend = T.shuriken ? .35 : .3; Z.back = .9; }
     if(Z.pend != null){ Z.pend -= dt; if(Z.pend <= 0){ Z.pend = null; enemyArrow(Z); } }
-    if(Z.back != null){ Z.back -= dt; if(Z.back <= 0){ Z.back = null; A.play('2H_Ranged_Aiming', {fade:.15}); } }
-    if(Z.shootT >= (T.shootT || 6.5) && mode === 'play'){ loseLife(Z, W.flechas); Z.state = 'leave'; Z.t = 0; A.play(Z.boat ? 'Idle' : T.walk, {ts:T.ts}); }
+    if(Z.back != null){ Z.back -= dt; if(Z.back <= 0){ Z.back = null; A.play(T.shuriken ? 'Idle' : '2H_Ranged_Aiming', {fade:.15}); } }
+    if(FASE < 5 && Z.shootT >= (T.shootT || 6.5) && mode === 'play'){ loseLife(Z, W.flechas); Z.state = 'leave'; Z.t = 0; A.play(Z.boat ? 'Idle' : T.walk, {ts:T.ts}); }
     boatSync(Z); return;
   }
   if(Z.state === 'leave'){   // depois de acertar o navio, o arqueiro vai embora
@@ -2279,7 +2497,7 @@ function arrive(Z){
   Z.t = 0;
   if(Z.final === 'break'){ Z.state = 'break'; Z.breakT = 0; Z.A.play(Z.T.attack || 'Unarmed_Melee_Attack_Punch_A', {ts:1.2}); if(Math.random() < .6) groan(Z.pos, 'groan', Z.T); }
   else if(Z.final === 'inside') enterHouse(Z);
-  else if(Z.final === 'shoot'){ Z.state = 'shoot'; Z.shootT = 0; Z.volley = .5; Z.A.play('2H_Ranged_Aiming'); }
+  else if(Z.final === 'shoot'){ Z.state = 'shoot'; Z.shootT = 0; Z.volley = .5; Z.A.play(Z.T.shuriken ? 'Idle' : '2H_Ranged_Aiming'); }
   else { Z.state = 'chimney'; loseLife(Z, W.subiu); }
 }
 function enterHouse(Z){ Z.state = 'enter'; Z.t = 0; loseLife(Z, Z.wall ? W.subiu : W.entrou); puffs(Z.pos.clone().setY(.6), 0xc39a6b, 8, .18); }
@@ -2307,7 +2525,7 @@ function damage(Z, dmg, from){
 function kill(Z){
   const wasHigh = Z.pos.y > .05;
   Z.state = 'dead'; Z.t = 0; Z.hy = 0; groan(Z.pos, 'die', Z.T); dropLadder(Z); sample('impacto', .45, rand(.9, 1.15), panOf(Z.pos), .2);
-  if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; }
+  if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; } if(Z.mark){ Z.A.g.remove(Z.mark); Z.mark = null; }
   Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true, fade:.08});
   if(wasHigh){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; }
   G.score += Z.T.pts; G.kills++; if(Z.T.strong) G.strong++;
@@ -2346,7 +2564,7 @@ function fire(ndc){
     const off = i === 0 ? V() : V(Math.cos(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1), 0, Math.sin(i/(w.n - 1)*Math.PI*2)*w.spread*rand(.5, 1));
     const to = T0.clone().add(off); if(i > 0) to.y = Math.max(0, i && hit.ground ? 0 : to.y);
     let from = start.clone().lerp(to, .55); from.y = Math.max(from.y, to.y + 1.5);
-    if(FASE === 3) from = shipMuzzle(to, w.kind); else if(FASE === 4) from = fortMuzzle(to, w.kind);
+    if(FASE === 3) from = shipMuzzle(to, w.kind); else if(FASE >= 4) from = fortMuzzle(to, w.kind);
     const arrow = w.kind === 'arrow' || w.kind === 'fire' || w.kind === 'axe' || w.kind === 'musket';
     const m = w.dyn ? makeDynamite(w) : w.kind === 'musket' ? makeBullet() : w.kind === 'cannon' ? makeBall(w) : w.kind === 'axe' ? makeAxe() : w.kind === 'rock' ? makeRock(w) : arrow ? makeArrow(w) : makeBomb(w); m.position.copy(from); world.add(m);
     const dist = from.distanceTo(to);
@@ -2354,7 +2572,7 @@ function fire(ndc){
     if(w.kind === 'musket'){ dur = clamp(dist*.012, .05, .14); arc = FASE === 4 ? Math.min(.25, dist*.02) : 0; } else if(w.kind === 'cannon'){ dur = clamp(.22 + dist*.035, .3, .6); arc = clamp(dist*.12, .3, 1.1); } else if(FASE === 3 && w.kind === 'arrow') arc = clamp(dist*.1, .2, .9);
     BOMBS.push({m, from, to, t:-i*.08, dur, w, arc, arrow});
     if(FASE >= 3 && w.kind !== 'bomb' && w.kind !== 'arrow') setTimeout(() => muzzle(from, to, w.kind), i*80);
-    if(FASE === 4) soldierShoot(from, to);
+    if(FASE >= 4) soldierShoot(from, to);
   }
   if(w.kind === 'arrow' || w.kind === 'fire') twang(w.kind === 'fire'); else if(w.kind !== 'musket' && w.kind !== 'cannon') whoosh();
 }
@@ -2463,7 +2681,9 @@ function thunk(p, flesh){ if(!ok()) return; sample(flesh ? 'acerto' : 'impacto',
 function fireWhoosh(p){ if(!ok()) return; const t = AC.currentTime, n = noise(), f = AC.createBiquadFilter(), g = AC.createGain(); f.type = 'lowpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(400, t + .6); env(g, t, .01, .6, .6); n.connect(f).connect(g); out(g, panOf(p), .3); n.start(t, Math.random()); n.stop(t + .7);
   for(let i=0;i<8;i++){ const c = noise(), cf = AC.createBiquadFilter(), cg = AC.createGain(), ct = t + .1 + Math.random()*1.4; cf.type = 'highpass'; cf.frequency.value = 2500; env(cg, ct, .001, rand(.04, .1), .03); c.connect(cf).connect(cg); out(cg, panOf(p), .2); c.start(ct, Math.random()); c.stop(ct + .05); } }
 function explode(p, w){
-  explosionFX(p, w.R, w.color); boom(w.R > 1.8, p, w.snd);
+  explosionFX(p, w.R*(w.smoke ? .6 : 1), w.color); boom(w.R > 1.8, p, w.snd);
+  if(w.smoke) for(let i=0;i<(w.R > 1.8 ? 18 : 11);i++){ const sm = new THREE.Mesh(puffGeo, fxMat(pick([0x9a98a8, 0x7d7a92, 0xc9c6d4]), .85)); const a = rand(0, 6.3), r = rand(0, w.R*.8); sm.position.set(p.x + Math.cos(a)*r, p.y + rand(.1, .5), p.z + Math.sin(a)*r); const sz = rand(.25, .45)*w.R;
+    fx(sm, 2.2, (f, k, dt) => { sm.position.y += dt*.25; sm.scale.setScalar(sz*(.5 + k)); sm.material.opacity = .85*(1 - k); }); }
   for(const Z of ZS.slice()){
     const c = Z.pos.clone(); c.y += Z.hy + Z.T.h*.5;
     if(c.distanceTo(p) < w.R + .25*Z.T.h) damage(Z, w.dmg, p);
@@ -2486,7 +2706,7 @@ function director(dt){
   if(G.gT <= 0){ G.gT = rand(1.4, 3.2); const w = ZS.filter(z => z.state === 'move' || z.state === 'break'); if(w.length){ const z = pick(w); groan(z.pos, 'groan', z.T); } }
   const interval = Math.max(.45, 2.5 - 1.75*ramp - .3*extra), maxAlive = 4 + Math.round(10*ramp + 6*extra);
   if(G.next <= 0 && alive < maxAlive){ spawn(pickType()); G.next = interval*rand(.6, 1.3); }
-  if(G.horde <= 0){ G.horde = rand(34, 44) - 10*extra; const n = 3 + Math.round(ramp*5 + extra*5); banner(W.horda, n + ' ' + W.uns + ' ao mesmo tempo', 'slime'); if(FASE === 3) vikingHorn(); if(FASE === 4){ for(let i=0;i<6;i++) setTimeout(() => drum(null, i % 3 === 0), i*240); } for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
+  if(G.horde <= 0){ G.horde = rand(34, 44) - 10*extra; const n = 3 + Math.round(ramp*5 + extra*5); banner(W.horda, n + ' ' + W.uns + ' ao mesmo tempo', 'slime'); if(FASE === 3) vikingHorn(); if(FASE >= 4){ for(let i=0;i<6;i++) setTimeout(() => drum(null, i % 3 === 0), i*240); } for(let i=0;i<n;i++) setTimeout(() => { if(G && mode === 'play') spawn(pickType(), i%2 === 0); }, i*280); }
 }
 
 /* ===== Fluxo ===== */
@@ -2508,7 +2728,7 @@ function gameOver(won){
   if(mode !== 'play') return;
   mode = 'ending'; endWon = won; endT = won ? 8.5 : 3.4; showPlayHUD(false); tutOff(); $('sizer').hidden = true;
   if(won){
-    banner(G.goal >= GOAL2 ? 'LENDA DA PIZZA!' : 'VITÓRIA!', G.goal >= GOAL2 ? '10.000 pontos! Ninguém segura essa família' : (FASE === 4 ? 'Forte salvo! Os soldados vão comer a pizza' : FASE === 3 ? 'Navio salvo! A tripulação vai comer a pizza' : FASE === 2 ? 'Castelo salvo! A família real vai comer a pizza' : 'Casa salva! A família vai comer a pizza'), 'win');
+    banner(G.goal >= GOAL2 ? 'LENDA DA PIZZA!' : 'VITÓRIA!', G.goal >= GOAL2 ? '10.000 pontos! Ninguém segura essa família' : (FASE === 5 ? 'Castelo salvo! O senhor samurai vai comer a pizza' : FASE === 4 ? 'Forte salvo! Os soldados vão comer a pizza' : FASE === 3 ? 'Navio salvo! A tripulação vai comer a pizza' : FASE === 2 ? 'Castelo salvo! A família real vai comer a pizza' : 'Casa salva! A família vai comer a pizza'), 'win');
     ZS.slice().forEach(Z => { if(!['dead', 'gone', 'enter', 'chimney'].includes(Z.state)){ explosionFX(Z.pos.clone().setY(Z.pos.y + .5), 1, 0xffd34d); kill2(Z); } });
     boom(true, null, 'dinamite'); startParty();
   } else {
@@ -2518,7 +2738,7 @@ function gameOver(won){
     groan(V(-2, 0, 0), 'groan', TYPES.zumbi); setTimeout(() => groan(V(2, 0, 0), 'groan', TYPES.gigante), 450);
   }
 }
-function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; } Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true}); if(Z.pos.y > .05){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; } }
+function kill2(Z){ Z.state = 'dead'; Z.t = 0; if(Z.bar){ Z.A.g.remove(Z.bar); Z.bar = null; } if(Z.mark){ Z.A.g.remove(Z.mark); Z.mark = null; } Z.A.play(Z.T.death || 'Death_A', {once:true, restart:true}); if(Z.pos.y > .05){ const out = V(Z.pos.x, 0, Z.pos.z).normalize().multiplyScalar(2.2); Z.fall = {v:V(out.x, 2.5, out.z)}; } }
 function showEnd(){
   mode = 'end';
   const won = endWon, stars = won ? (G.lives >= 4 ? 3 : G.lives >= 2 ? 2 : 1) : 0;
@@ -2535,7 +2755,7 @@ function showEnd(){
     else info = STICKER ? 'Este adesivo foi registrado por outro celular, então aqui o jogo vai só até 5.000. Peça uma pizza e registre o adesivo com o seu celular para ganhar pontos e jogar até 10.000.' : 'Sem adesivo o jogo vai até 5.000. Escaneie o adesivo da sua pizza e registre com o seu celular para jogar até 10.000.';
   } else if(won) info = 'Você é a LENDA DA PIZZA! Mas ' + W.Os.toLowerCase() + ' não desistem: dizem que na próxima fase eles voltam em dobro... Que tal mais uma pizza para encarar o próximo desafio?';
   $('eCont').hidden = !canGo;
-  $('eTitle').textContent = won ? (G.goal >= GOAL2 ? 'Lenda da pizza!' : W.Casa + ' salvo!'.replace('Casa salvo', 'Casa salva')) : (FASE === 4 ? 'Os guerreiros tomaram o forte' : FASE === 3 ? 'Os vikings tomaram o navio' : W.Os + ' entraram');
+  $('eTitle').textContent = won ? (G.goal >= GOAL2 ? 'Lenda da pizza!' : W.Casa + ' salvo!'.replace('Casa salvo', 'Casa salva')) : (FASE === 5 ? 'Os invasores tomaram o castelo' : FASE === 4 ? 'Os guerreiros tomaram o forte' : FASE === 3 ? 'Os vikings tomaram o navio' : W.Os + ' entraram');
   $('eStars').innerHTML = [0, 1, 2].map(i => '<svg viewBox="0 0 24 24" class="' + (i < stars ? 'on' : 'off') + '" aria-hidden="true">' + STAR + '</svg>').join('');
   $('eScore').textContent = fmt(G.score);
   const lines = [[W.Inv + ' derrotados', String(G.kills)], [W.Inv + ' fortes (100 pts)', String(G.strong)], ['Vidas restantes', G.lives + ' de ' + LIVES], ['Melhor arma', WEAPONS[G.w].name]];
@@ -2790,6 +3010,7 @@ function loop(time, frame){
     if(party) updateParty(dt);
     updateFX(dt);
     if(houseShake > 0){ houseShake = Math.max(0, houseShake - dt); house.position.set(Math.sin(now/18)*.06*houseShake*2, 0, Math.cos(now/23)*.05*houseShake*2); } else house.position.set(0, 0, 0);
+    if(FASE === 5) updateSoldiers(dt);
     if(FASE === 4){ const ts = now/1000; updateSoldiers(dt);
       if(FLAG4){ const pa = FLAG4.geometry.attributes.position; for(let i=0;i<pa.count;i++){ const x = pa.getX(i) + .375; pa.setZ(i, Math.sin(ts*5 + x*7)*.05*x); } pa.needsUpdate = true; }
       if(CAMPFIRE) CAMPFIRE.children.forEach((f, j) => { if(f.userData.h) f.scale.y = f.userData.h*(.8 + .3*Math.sin(now/80 + j*2)); }); }
