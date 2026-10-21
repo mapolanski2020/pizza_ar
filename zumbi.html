@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icone.png">
 <title>Zumbis da Pizza AR</title>
 <meta name="theme-color" content="#14110d">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -111,6 +113,21 @@ body.cine::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:
 @keyframes cineIn{from{box-shadow:inset 0 0 0 #000,inset 0 0 0 #000}}
 body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px var(--danger),inset 0 0 80px rgba(239,90,76,.5);pointer-events:none;z-index:5;animation:hitfl .55s ease forwards}
 @keyframes hitfl{to{opacity:0}}
+#bFull{position:fixed;right:14px;bottom:calc(108px + env(safe-area-inset-bottom,0px));z-index:4;width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;pointer-events:auto}
+#bFull svg{width:20px;height:20px}
+.fsNote{margin:0;font-size:12.5px;line-height:1.45;color:var(--ash)}
+/* tablets: tudo um pouco maior (placar, botões, mira, mensagens e cartões) */
+@media (min-width:700px) and (min-height:540px){
+  .top,.bottom,.quit,.skip,.sizer,.panel{zoom:1.3}   /* som e tela cheia ficam dentro do placar (.top) */
+  #cross{width:84px;height:84px}
+  .banner{width:min(80vw,700px)} .banner b{font-size:54px} .banner span{font-size:19px} .banner.win b{font-size:92px}
+  .tip{width:min(440px,calc(100% - 40px));font-size:18px;padding:14px 18px;bottom:calc(190px + env(safe-area-inset-bottom,0px))}
+  .guide p{max-width:460px;font-size:18px} .guide p b{font-size:26px} .guide .scene{transform:scale(1.3);margin-bottom:40px}
+  .scan p{font-size:20px}
+  .pop{font-size:27px} .pop.big{font-size:36px} .pop.yay{font-size:32px}
+  .finger{transform:scale(1.3)}
+}
+@media (min-width:1100px) and (min-height:700px){ .top,.bottom,.quit,.skip,.sizer{zoom:1.45} .panel{zoom:1.4} }
 #bSound,#bQuit{width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center}
 #bQuit svg{width:20px;height:20px}
 #bSound{position:fixed;right:14px;bottom:calc(62px + env(safe-area-inset-bottom,0px));z-index:4;width:40px;height:40px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;pointer-events:auto}
@@ -122,9 +139,10 @@ body.hit::after{content:"";position:fixed;inset:0;box-shadow:inset 0 0 0 10px va
 .sizer label span{display:flex;justify-content:space-between}
 .sizer label output{color:var(--flour);font-variant-numeric:tabular-nums}
 .sizer input[type=range]{width:100%;accent-color:var(--ember);height:28px}
-.screen{position:fixed;inset:0;z-index:6;display:grid;place-items:center;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto;background:radial-gradient(120% 80% at 50% 110%,#2f4a1c 0%,#1d2414 45%,var(--oven) 100%)}
+.screen{position:fixed;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;-webkit-overflow-scrolling:touch;padding:calc(20px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));overflow:auto;background:radial-gradient(120% 80% at 50% 110%,#2f4a1c 0%,#1d2414 45%,var(--oven) 100%)}
 .screen.over{background:rgba(12,10,8,.62)}
-.screen.over.won{background:linear-gradient(transparent 35%,rgba(12,10,8,.55));place-items:end center}
+.screen.over.won{background:linear-gradient(transparent 35%,rgba(12,10,8,.55))}
+.screen.over.won>.panel{margin:auto auto 0}
 .panel{width:min(440px,100%);background:rgba(28,23,17,.95);border:1px solid var(--line);border-radius:22px;padding:22px;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 50px rgba(0,0,0,.45)}
 .eyebrow{margin:0;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--slime);font-weight:800}
 h1{margin:-6px 0 0;font-family:var(--display);font-weight:400;font-size:40px;line-height:1.05;color:var(--crust)}
@@ -154,6 +172,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
 .stars .on path{fill:var(--crust)}
 .stars .off path{fill:var(--slot);stroke:var(--line)}
 @media (prefers-reduced-motion:reduce){.scan .box{animation:none}.pop{animation-duration:.01s}.banner.show{animation-duration:2.4s}}
+.screen>.panel{margin:auto;flex:none}
 </style>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
@@ -176,6 +195,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
     <div class="hearts" id="hLives" aria-label="Vidas"></div>
     <div class="tools">
       <button class="ghost" id="bSound" type="button" aria-label="Som">Som</button>
+      <button class="ghost" id="bFull" type="button" aria-label="Tela cheia" title="Tela cheia" hidden></button>
       <button class="ghost" id="bSize" type="button" hidden>Tamanho</button>
       <button class="ghost" id="bPlace" type="button" hidden>Reposicionar</button>
     </div>
@@ -219,6 +239,7 @@ h2{margin:0;font-family:var(--display);font-weight:400;font-size:30px;color:var(
     <button class="btn" id="go3D" type="button" disabled>Jogar sem câmera</button>
     <p class="err" id="startErr" hidden></p>
     <p class="note" id="bestNote"></p>
+    <p class="fsNote" id="fsNote" hidden>Para jogar em tela cheia no iPhone: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>, e abra o jogo pelo ícone.</p>
     <a class="note" href="index.html" id="backLink" onclick="var q=location.search.match(/[?&]s=([^&]+)/);if(q)this.href='index.html?s='+q[1];">← Voltar às fases</a>
   </div>
 </section>
@@ -2488,7 +2509,7 @@ function showEnd(){
   $('end').hidden = false; $('touch').hidden = true; $('hud').hidden = true; $('bQuit').hidden = true; $('scan').hidden = true;
 }
 function cleanupEnd(){ endParty(); music(null); door.rotation.y = 0; }
-$('eAgain').addEventListener('click', () => { cleanupEnd(); newGame(); });
+$('eAgain').addEventListener('click', () => { if(AR !== 'xr') FS.enter(); cleanupEnd(); newGame(); });
 $('eCont').addEventListener('click', () => {
   cleanupEnd(); ZS.slice().forEach(removeZ);
   G.goal = GOAL2; G.next = 3.5; G.horde = 45;
@@ -2630,9 +2651,26 @@ async function begin(ar){
   }
   btn.disabled = false; btn.textContent = label;
 }
+/* ===== Tela cheia (Android, tablets e computador). No iPhone o navegador não deixa: o jogo pede para adicionar à Tela de Início ===== */
+const FS = {el:document.documentElement,
+  can(){ return !!(this.el.requestFullscreen || this.el.webkitRequestFullscreen); },
+  on(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+  enter(){ if(this.on() || !this.can()) return; try{ const r = (this.el.requestFullscreen || this.el.webkitRequestFullscreen).call(this.el, {navigationUI:'hide'}); if(r && r.catch) r.catch(() => {}); }catch(e){} },
+  exit(){ try{ const r = (document.exitFullscreen || document.webkitExitFullscreen).call(document); if(r && r.catch) r.catch(() => {}); }catch(e){} }};
+const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || navigator.standalone;
+if(!FS.can() && !standalone && /iPhone|iPod/.test(navigator.userAgent)) $('fsNote').hidden = false;
+function renderFull(){ const b = $('bFull'); b.hidden = !FS.can();
+  b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (FS.on() ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>') + '</svg>';
+  b.setAttribute('aria-label', FS.on() ? 'Sair da tela cheia' : 'Tela cheia'); }
+$('bFull').addEventListener('click', () => { FS.on() ? FS.exit() : FS.enter(); });
+['fullscreenchange', 'webkitfullscreenchange'].forEach(e => document.addEventListener(e, () => { renderFull(); setTimeout(() => dispatchEvent(new Event('resize')), 120); }));
+renderFull();
+// ao girar o tablet ou mudar o tamanho: refaz a câmera e mantém o tabuleiro inteiro dentro do zoom
+addEventListener('resize', () => { if(!renderer || !camera || mindar || AR === 'xr') return; camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); if(!AR) zoomTo(orbit.dist); });
+addEventListener('orientationchange', () => setTimeout(() => dispatchEvent(new Event('resize')), 300));
 let xrOK = false;
 if(navigator.xr && navigator.xr.isSessionSupported) navigator.xr.isSessionSupported('immersive-ar').then(ok => { xrOK = ok; }, () => {});
-$('goAR').addEventListener('click', () => begin(new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'slam')));
+$('goAR').addEventListener('click', () => { const m = new URLSearchParams(location.search).get('ar') || (xrOK ? 'xr' : 'slam'); if(m !== 'xr') FS.enter(); begin(m); });
 function placeXR(){
   if(!reticle || !reticle.visible) return;
   if(AR === 'slam'){ root.matrixAutoUpdate = true; root.position.copy(SL.pos); root.quaternion.copy(SL.quat); SL.unit = SL.dist; applyScale(); root.visible = true; fitClip();
@@ -2648,7 +2686,7 @@ $('bPlace').addEventListener('click', () => {
   if(PLACE(AR)){ tracking = false; root.visible = false; $('xrHint').hidden = false; tutOff(); if(AR === 'slam'){ SL.state = 'plane'; foundShown = null; } }
   else if(AR === 'mind'){ tracking = false; root.visible = false; $('scan').hidden = false; }
 });
-$('go3D').addEventListener('click', () => begin(false));
+$('go3D').addEventListener('click', () => { FS.enter(); begin(false); });
 
 window.ZG = {get owner(){ return OWNER; }, mk:(key, h, anim, x, ry = 0, gear)=>{ const A = actor(key, h, false, false, gear); A.g.position.set(x, 0, 3.6); A.g.rotation.y = ry; world.add(A.g); A.play(anim); setInterval(() => A.mixer.update(.016), 16); return 1; }, ndcOf:(p)=>{ const v = world.localToWorld(p.clone()).project(viewCam()); return new THREE.Vector2(v.x, v.y); }, lineup:(anim = 'Idle')=>{ const out = []; LOOKS.forEach((L, i) => { const A = actor([0, 2, 4].includes(i) ? 'Barbarian' : 'Rogue', 1, true, true, null, i); A.g.position.set((i - 4)*.62, 0, 3.6); world.add(A.g); A.play(anim); out.push(A); }); setInterval(() => out.forEach(A => A.mixer.update(.016)), 16); return out.length; }, dbgFace:()=>{ const z=ZS.find(z=>z.A.bones); if(!z) return 'none'; const hb=z.A.m.getObjectByName('head'); const w=V(); hb.getWorldPosition(w); const kids=hb.children.filter(c=>c.isMesh).map(c=>{const p=V(); c.getWorldPosition(p); const sc=V(); c.getWorldScale(sc); return [p.toArray().map(v=>+v.toFixed(2)), +sc.x.toFixed(3)];}); return {head:w.toArray().map(v=>+v.toFixed(2)), pos:z.pos.toArray(), kids:kids.slice(0,4)}; }, renderJingle: async () => { const oldAC = AC, oldOUT = OUT, oldREV = REV, oldMUS = MUS, oldM = muted; muted = false;
     AC = new OfflineAudioContext(2, 44100*3.5, 44100); OUT = null; bus(); victoryJingle(); const buf = await AC.startRendering();

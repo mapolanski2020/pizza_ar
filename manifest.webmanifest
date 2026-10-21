@@ -1,0 +1,11 @@
+{
+  "name": "Monte a Pizza",
+  "short_name": "Monte a Pizza",
+  "start_url": "index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#14110d",
+  "theme_color": "#14110d",
+  "icons": [{"src": "icone.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}]
+}
